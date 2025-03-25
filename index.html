@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NASA vs SpaceX Dashboard</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <style>
+    body { font-family: Arial; margin: 40px; }
+    .tooltip {
+      position: absolute;
+      background: #333;
+      color: white;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .filter-panel { margin-bottom: 20px; }
+    .bar:hover { fill-opacity: 1; }
+  </style>
+</head>
+
+<body>
+  <h1>NASA vs SpaceX Launch Dashboard</h1>
+
+  <div class="filter-panel">
+    <label>Filter by Agency:
+      <select id="agency-filter">
+        <option value="">All</option>
+      </select>
+    </label>
+    <label>Filter by Year:
+      <select id="year-filter">
+        <option value="">All</option>
+      </select>
+    </label>
+    <button onclick="applyFilters()">Apply Filters</button>
+    <button onclick="updateChart(allData)">Reset Filters</button>
+  </div>
+
+  <!-- Bar Chart Section -->
+  <div id="chart"></div>
+  <div id="tooltip" class="tooltip"></div>
+
+  <!-- Rocket Animation -->
+  <h2>Rocket Launch Animation</h2>
+  <svg id="rocketChart" width="1000" height="300"></svg>
+
+  <!-- Force Bubble Chart -->
+  <h2>Launch Force Bubble Chart</h2>
+  <svg id="forceChart" width="1000" height="500"></svg>
+
+  <!-- Link JS Script -->
+  <script src="/static/d3-script.js" defer></script>
+</body>
+</html>
