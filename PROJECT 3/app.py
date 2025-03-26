@@ -81,18 +81,11 @@ from pathlib import Path
 
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-
-    try:
-        base_path = Path(__file__).parent
-    except NameError:
-        # 👇 This is the fix: get the parent of the current working directory
-        base_path = Path().resolve().parent
-
     csv_path = Path(r"C:\Users\Antho\OneDrive\Desktop\PROJECT 3\static\launch_data.csv")
     print(f"Loading from path: {csv_path}")
-
+    
     df = pd.read_csv(csv_path)
-
+    
     with get_conn_cursor() as (conn, cur):
         insert_query = """
             INSERT INTO launches (
@@ -112,10 +105,9 @@ def load_csv_to_postgres():
             )
             for _, row in df.iterrows()
         ]
-
         cur.executemany(insert_query, values)
-
-    print("✅ CSV data loaded into PostgreSQL.")
+    
+    print("✅ CSV data loaded into Postgres.")
 
 
 
