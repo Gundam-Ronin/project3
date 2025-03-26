@@ -1,13 +1,13 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>NASA vs SpaceX Launch Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="{{ url_for('static', filename='js/d3-tree.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/collide.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
+  <script src="/static/js/collide.js" defer></script>
+  <script src="/static/js/d3-tree.js" defer></script>
 </head>
 <body>
   <h1>NASA vs SpaceX Launch Dashboard</h1>
@@ -34,13 +34,12 @@
 
   <section>
     <h2>Force Bubble Collide Chart</h2>
-    <svg id="bubble-chart" width="800" height="400"></svg>
+    <canvas id="bubble-canvas" width="800" height="400"></canvas>
   </section>
 
   <section>
     <h2>Launch Tree Chart</h2>
-    <svg id="tree-chart" width="800" height="500"></svg>
+    <svg id="tree-chart" width="800" height="400"></svg>
   </section>
 </body>
 </html>
-
