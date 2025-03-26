@@ -16,28 +16,26 @@ def load_csv_to_postgres():
     df = df.dropna(subset=["Mission", "Date"])
 
 
-    # Clear old rows
-    cur.execute("DELETE FROM launches")
 
-    # Insert updated rows
-    for _, row in df.iterrows():
-        cur.execute("""
-            INSERT INTO launches (
-                mission_name, launch_date, launch_year,
-                agency, rocket, rocket_status,
-                location, success, failure_reason
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            row.get("mission_name"),
-            row.get("launch_date"),
-            int(row.get("launch_year")) if pd.notnull(row.get("launch_year")) else None,
-            row.get("agency"),
-            row.get("rocket"),
-            row.get("rocket_status"),
-            row.get("location"),
-            row.get("success"),
-            row.get("failure_reason")
-        ))
+    # Clear old rows
+    cur.execute("""
+    INSERT INTO launches (
+        mission_name, launch_date, launch_year,
+        agency, rocket, rocket_status,
+        location, success, failure_reason
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+""", (
+    row.get("Mission"),
+    row.get("Date"),
+    pd.to_datetime(row.get("Date")).year if pd.notnull(row.get("Date")) else None,
+    row.get("Company"),
+    row.get("Rocket"),
+    row.get("RocketStatus"),
+    row.get("Location"),
+    1 if row.get("MissionStatus") == "Success" else 0,
+    None if row.get("MissionStatus") == "Success" else row.get("MissionStatus")
+))
+
 
     conn.commit()
     cur.close()
