@@ -1,21 +1,20 @@
-import os
-import pandas as pd
-import psycopg2
-import requests
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from psycopg2 import pool
 from contextlib import contextmanager
-
-# Configuration
-CSV_FILE_PATH = "space_missions.csv"  # use relative path
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db")
+import os
+from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Configuration
+CSV_FILE_PATH = "space_missions.csv"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db")
+
 
 # Flask setup
-app = Flask(__name__, static_folder="static", template_folder="templates")
+app = Flask(__name__)
 CORS(app)
 
 # Database connection pool
