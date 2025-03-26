@@ -74,14 +74,15 @@ def create_launches_table():
             );
         """)
 
-# Load CSV data to Postgres
+import os
+
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
 
-    # Use relative path for production
-    csv_path = os.path.join(os.path.dirname(__file__), 'static', 'launch_data.csv')
+    # Relative path that works on deployment
+    csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'launch_data.csv')
     df = pd.read_csv(csv_path)
-
+    
     with get_conn_cursor() as (conn, cur):
         insert_query = """
             INSERT INTO launches (
@@ -106,6 +107,7 @@ def load_csv_to_postgres():
         cur.executemany(insert_query, values)
 
     print("✅ CSV data loaded into Postgres.")
+
 
 # API routes
 @app.route("/")
