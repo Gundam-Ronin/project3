@@ -13,7 +13,8 @@ def load_csv_to_postgres():
 
 
     # Optional: Drop incomplete rows
-    df = df.dropna(subset=["mission_name", "launch_date"])
+    df = df.dropna(subset=["Mission", "Date"])
+
 
     # Clear old rows
     cur.execute("DELETE FROM launches")
