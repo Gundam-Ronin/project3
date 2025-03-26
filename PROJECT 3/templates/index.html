@@ -5,6 +5,9 @@
   <title>NASA vs SpaceX Launch Dashboard</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="{{ url_for('static', filename='js/collide.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/d3-tree.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
 </head>
 <body>
   <h1>NASA vs SpaceX Launch Dashboard</h1>
@@ -30,17 +33,13 @@
   </section>
 
   <section>
-    <h2>Force Bubble Chart (Payload / Success)</h2>
-    <svg id="bubble-chart" width="800" height="400"></svg>
+    <h2>Force Bubble Collide Chart</h2>
+    <canvas id="bubble-canvas" width="800" height="400"></canvas>
   </section>
 
   <section>
-    <h2>Launches per Year (Bar Chart)</h2>
-    <svg id="bar-chart" width="800" height="400"></svg>
+    <h2>Launch Tree Chart</h2>
+    <svg id="tree-chart" width="800" height="400"></svg>
   </section>
-
-  <!-- Defer JS to ensure DOM is loaded -->
-  <script src="{{ url_for('static', filename='js/collide.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
 </body>
 </html>
