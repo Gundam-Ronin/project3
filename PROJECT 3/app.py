@@ -82,8 +82,14 @@ from pathlib import Path
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
 
-    # Correct path that works in both local and deployed environment
-    csv_path = Path(__file__).parent / "static" / "launch_data.csv"
+    # ✅ Handle both script and notebook environments
+    try:
+        base_path = Path(__file__).parent
+    except NameError:
+        base_path = Path().resolve()
+
+    csv_path = base_path / "static" / "launch_data.csv"
+    print(f"Loading from path: {csv_path}")
 
     df = pd.read_csv(csv_path)
 
@@ -110,7 +116,8 @@ def load_csv_to_postgres():
 
         cur.executemany(insert_query, values)
 
-    print("✅ CSV data loaded into Postgres.")
+    print("✅ CSV data loaded into PostgreSQL.")
+
 
 
 # API routes
