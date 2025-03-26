@@ -2,35 +2,43 @@ document.addEventListener("DOMContentLoaded", () => {
   fetch("/api/launches")
     .then(response => response.json())
     .then(data => {
-      try {
-        setupDropdowns(data);
-        renderCharts(data);
-      } catch (err) {
-        console.error("Error in renderCharts:", err);
-      }
+      setupDropdowns(data);
+      renderCharts(data);
 
       document.getElementById("apply-filters").addEventListener("click", () => {
         const filtered = applyFilters(data);
-        try {
-          renderCharts(filtered);
-        } catch (err) {
-          console.error("Error in renderCharts with filters:", err);
-        }
+        renderCharts(filtered);
       });
 
       document.getElementById("reset-filters").addEventListener("click", () => {
-        document.getElementById("agency-filter").value = "All";
-        document.getElementById("year-filter").value = "All";
-        try {
-          renderCharts(data);
-        } catch (err) {
-          console.error("Error in resetCharts:", err);
-        }
+        resetFilters(data);
       });
-    })
-    .catch(error => {
-      console.error("Failed to fetch /api/launches:", error);
     });
+
+  function setupDropdowns(data) {
+    const agencySelect = d3.select("#agency-filter");
+    const yearSelect = d3.select("#year-filter");
+
+    const agencies = Array.from(new Set(data.map(d => d.agency))).sort();
+    const years = Array.from(new Set(data.map(d => d.launch_year))).sort((a, b) => a - b);
+
+    agencySelect.selectAll("option:not(:first-child)").remove();
+    yearSelect.selectAll("option:not(:first-child)").remove();
+
+    agencySelect.selectAll("option.agency")
+      .data(agencies)
+      .enter()
+      .append("option")
+      .attr("class", "agency")
+      .text(d => d)
+      .attr("value", d => d);
+
+    yearSelect.selectAll("option.year")
+      .data(years)
+      .enter()
+      .append("option")
+      .attr("class", "year")
+      .text(d => d)
+      .attr("value", d => d);
+  }
 });
-
-
