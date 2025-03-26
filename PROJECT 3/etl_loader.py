@@ -27,7 +27,6 @@ def load_csv_to_postgres():
     df = df.dropna(subset=["mission_name", "launch_date"])
 
     # Clear old rows
-        # Clear old rows
     cur.execute("DELETE FROM launches")
 
     # Insert updated rows
@@ -39,17 +38,16 @@ def load_csv_to_postgres():
                 location, success, failure_reason
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            row.get("Mission"),
-            row.get("Date"),
-            pd.to_datetime(row.get("Date")).year if pd.notnull(row.get("Date")) else None,
-            row.get("Company"),
-            row.get("Rocket"),
-            row.get("RocketStatus"),
-            row.get("Location"),
-            True if row.get("MissionStatus") == "Success" else False,
-            None if row.get("MissionStatus") == "Success" else row.get("MissionStatus")
+            row.get("mission_name"),
+            row.get("launch_date"),
+            pd.to_datetime(row.get("launch_date")).year if pd.notnull(row.get("launch_date")) else None,
+            row.get("agency"),
+            row.get("rocket"),
+            row.get("rocket_status"),
+            row.get("location"),
+            True if row.get("mission_status") == "Success" else False,
+            None if row.get("mission_status") == "Success" else row.get("mission_status")
         ))
-
 
     conn.commit()
     cur.close()
