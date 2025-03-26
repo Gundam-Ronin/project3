@@ -68,50 +68,32 @@ def create_launches_table():
 # Load CSV into PostgreSQL
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    df = pd.read_csv(CSV_FILE_PATH, encoding="ISO-8859-1")
-    df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
-    df = df.rename(columns={"rocketstatus": "rocket_status", "missionstatus": "mission_status"})
-
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["time"] = pd.to_datetime(df["time"], format="%H:%M:%S", errors="coerce").dt.time
-    df["launch_date"] = df["date"].dt.date
-    df["launch_year"] = df["date"].dt.year
-    df["price"] = (
-        df["price"]
-        .astype(str)
-        .str.replace(",", "")
-        .str.strip()
-        .replace("None", pd.NA)
-    )
-    df["price"] = pd.to_numeric(df["price"], errors="coerce")
-    df["success"] = df["mission_status"].str.contains("Success", case=False, na=False)
-    df["failure_reason"] = df["mission_status"].where(~df["success"], None)
-    df["mission_name"] = df["mission"]
-    df["agency"] = df["company"]
-    df = df[df["date"].notna() & df["time"].notna()]
-
+    df = pd.read_csv("static/data/launch_data.csv")
     with get_conn_cursor() as (conn, cur):
-        for _, row in df.iterrows():
-            try:
-                cur.execute("""
-                    INSERT INTO launches (
-                        mission_name, launch_date, launch_year, success, failure_reason, agency,
-                        company, location, date, time, rocket, mission,
-                        rocket_status, price, mission_status, source_id
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (source_id) DO NOTHING;
-                """, (
-                    row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
-                    row.get("success"), row.get("failure_reason"), row.get("agency"),
-                    row.get("company"), row.get("location"), row.get("date"), row.get("time"),
-                    row.get("rocket"), row.get("mission"), row.get("rocket_status"),
-                    row.get("price"), row.get("mission_status"),
-                    f"{row.get('company')}_{row.get('date')}"
-                ))
-            except Exception as e:
-                print("❌ Insert error:", e)
+        insert_query = """
+            INSERT INTO launches (
+                mission_name, launch_date, launch_year, success, failure_reason, agency,
+                company, location, date, time, rocket, mission,
+                rocket_status, price, mission_status, source_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (source_id) DO NOTHING;
+        """
+
+        values = [
+            (
+                row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
+                row.get("success"), row.get("failure_reason"), row.get("agency"),
+                row.get("company"), row.get("location"), row.get("date"), row.get("time"),
+                row.get("rocket"), row.get("mission"), row.get("rocket_status"),
+                row.get("price"), row.get("mission_status"), row.get("source_id")
+            )
+            for _, row in df.iterrows()
+        ]
+
+        cur.executemany(insert_query, values)
 
     print("✅ CSV data loaded into Postgres.")
+
 
 # Route definitions
 @app.route("/")
