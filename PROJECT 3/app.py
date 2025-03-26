@@ -82,7 +82,9 @@ from pathlib import Path
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
 
-    csv_path = Path.cwd().parent / "static" / "launch_data.csv"
+    # Correct path that works in both local and deployed environment
+    csv_path = Path(__file__).parent / "static" / "launch_data.csv"
+
     df = pd.read_csv(csv_path)
 
     with get_conn_cursor() as (conn, cur):
