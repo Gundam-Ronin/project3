@@ -13,10 +13,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# 🌐 Load DATABASE_URL with sslmode
+# Load database URL from environment or use fallback
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a/launches_db?sslmode=require")
 
-# 🧠 Global connection pool
+# Global connection pool
 db_pool = None
 
 def init_db_pool():
@@ -48,6 +48,7 @@ def create_launches_table():
         success BOOLEAN,
         failure_reason TEXT,
         agency TEXT,
+        payload_mass_kg FLOAT,
         source_id TEXT UNIQUE
     );
     """
@@ -67,9 +68,9 @@ def load_csv_to_postgres():
         insert_query = """
         INSERT INTO launches (
             mission_name, launch_date, launch_year, success,
-            failure_reason, agency, source_id
+            failure_reason, agency, payload_mass_kg, source_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source_id) DO NOTHING;
         """
         for _, row in df.iterrows():
@@ -80,11 +81,11 @@ def load_csv_to_postgres():
                 row['success'],
                 row.get('failure_reason'),
                 row['agency'],
+                row.get('payload_mass_kg', 0),
                 row['source_id']
             ))
     print("✅ Data loaded successfully.")
 
-# 🚀 API ROUTES
 @app.route("/")
 def dashboard():
     return render_template("index.html")
@@ -97,7 +98,6 @@ def api_get_launches():
         data = [dict(zip(columns, row)) for row in cur.fetchall()]
     return jsonify(data)
 
-# 🔁 INIT + RUN
 def initialize_app():
     create_launches_table()
     if os.environ.get("FLASK_ENV") != "production":
