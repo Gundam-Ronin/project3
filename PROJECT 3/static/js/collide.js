@@ -1,38 +1,32 @@
-// collide.js — Force Collide Chart using Canvas
-
 function renderCollideChart(data) {
-  const canvas = document.getElementById("bubble-canvas");
-  const width = canvas.width;
-  const height = canvas.height;
-  const context = canvas.getContext("2d");
-  const color = d3.scaleOrdinal(d3.schemeTableau10);
+  const svg = d3.select("#bubble-chart");
+  const width = +svg.attr("width");
+  const height = +svg.attr("height");
 
-  const nodes = data.map(d => ({
-    x: Math.random() * width,
-    y: Math.random() * height,
-    r: Math.sqrt(d.payload_mass_kg || 1),
-    group: d.agency || "Unknown"
-  }));
+  svg.selectAll("*").remove(); // Clear old content
 
-  const simulation = d3.forceSimulation(nodes)
-    .force("x", d3.forceX(width / 2).strength(0.01))
-    .force("y", d3.forceY(height / 2).strength(0.01))
-    .force("collide", d3.forceCollide().radius(d => d.r + 2).iterations(3))
-    .on("tick", ticked);
+  const radiusScale = d3.scaleSqrt()
+    .domain([0, d3.max(data, d => +d.payload_mass_kg || 0)])
+    .range([5, 40]);
 
-  function ticked() {
-    context.clearRect(0, 0, width, height);
-    for (let d of nodes) {
-      context.beginPath();
-      context.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
-      context.fillStyle = color(d.group);
-      context.fill();
-    }
-  }
+  const simulation = d3.forceSimulation(data)
+    .force("x", d3.forceX(width / 2).strength(0.05))
+    .force("y", d3.forceY(height / 2).strength(0.05))
+    .force("collide", d3.forceCollide(d => radiusScale(+d.payload_mass_kg || 0) + 2))
+    .stop();
 
-  canvas.addEventListener("pointermove", function (event) {
-    const [x, y] = d3.pointer(event);
-    nodes[0].fx = x;
-    nodes[0].fy = y;
-  });
+  for (let i = 0; i < 300; ++i) simulation.tick();
+
+  svg.selectAll("circle")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("cx", d => d.x)
+    .attr("cy", d => d.y)
+    .attr("r", d => radiusScale(+d.payload_mass_kg || 0))
+    .attr("fill", d => d.success === true ? "#4caf50" : "#f44336")
+    .attr("stroke", "#333")
+    .attr("stroke-width", 1)
+    .append("title")
+    .text(d => `${d.mission_name}\nPayload: ${d.payload_mass_kg} kg\nSuccess: ${d.success}`);
 }
