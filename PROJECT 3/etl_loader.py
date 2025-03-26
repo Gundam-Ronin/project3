@@ -27,11 +27,7 @@ def load_csv_to_postgres():
     df = df.dropna(subset=["mission_name", "launch_date"])
 
     # Clear old rows
-    cur.execute("DELETE FROM launches")
-
-    # ✅ THIS was missing:
-    for _, row in df.iterrows():
-        cur.execute("""
+    cur.execute("""
             INSERT INTO launches (
                 mission_name, launch_date, launch_year,
                 agency, rocket, rocket_status,
@@ -45,9 +41,10 @@ def load_csv_to_postgres():
             row.get("rocket"),
             row.get("rocket_status"),
             row.get("location"),
-            1 if row.get("mission_status") == "Success" else 0,
+            True if row.get("mission_status") == "Success" else False,
             None if row.get("mission_status") == "Success" else row.get("mission_status")
         ))
+
 
     conn.commit()
     cur.close()
