@@ -79,7 +79,7 @@ def create_launches_table():
 # Load CSV (only in dev/local)
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    csv_path = os.path.join(os.getcwd(), 'static', 'launch_data.csv')
+    csv_path = Path.cwd().parent / "static" / "launch_data.csv"
     df = pd.read_csv(csv_path)
 
     with get_conn_cursor() as (_, cur):
