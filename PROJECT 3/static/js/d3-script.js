@@ -1,155 +1,180 @@
-// D3-SCRIPT.JS
+// d3-script.js
 
-// Fetch and render all charts on page load
-fetch('/api/launches')
-  .then(res => res.json())
-  .then(data => {
-    window.launchData = data;
-    populateFilters(data);
-    renderCharts(data);
-  });
+document.addEventListener("DOMContentLoaded", async function () {
+    const API_URL = "/api/launches";
 
-document.getElementById('apply-filters').addEventListener('click', () => {
-  const filtered = applyFilters(window.launchData);
-  renderCharts(filtered);
+    let allData = [];
+
+    // Fetch data from your Flask API
+    try {
+        const response = await fetch(API_URL);
+        allData = await response.json();
+    } catch (error) {
+        console.error("Failed to fetch data from API:", error);
+        return;
+    }
+
+    console.log("🚀 Launch data loaded:", allData);
+
+    // Extract unique agencies and years for dropdowns
+    const agencies = [...new Set(allData.map(d => d.agency).filter(Boolean))];
+    const years = [...new Set(allData.map(d => d.launch_year).filter(Boolean))].sort();
+
+    populateDropdown("#agencyFilter", ["All", ...agencies]);
+    populateDropdown("#yearFilter", ["All", ...years]);
+
+    document.getElementById("applyFilters").addEventListener("click", () => {
+        const agency = document.getElementById("agencyFilter").value;
+        const year = document.getElementById("yearFilter").value;
+        const filtered = filterData(allData, agency, year);
+        updateVisuals(filtered);
+    });
+
+    document.getElementById("resetFilters").addEventListener("click", () => {
+        document.getElementById("agencyFilter").value = "All";
+        document.getElementById("yearFilter").value = "All";
+        updateVisuals(allData);
+    });
+
+    updateVisuals(allData);
 });
 
-document.getElementById('reset-filters').addEventListener('click', () => {
-  document.getElementById('agency-filter').value = 'All';
-  document.getElementById('year-filter').value = 'All';
-  renderCharts(window.launchData);
-});
-
-function populateFilters(data) {
-  const agencies = [...new Set(data.map(d => d.agency))];
-  const years = [...new Set(data.map(d => d.launch_year))].sort();
-
-  const agencySelect = document.getElementById('agency-filter');
-  const yearSelect = document.getElementById('year-filter');
-
-  agencies.forEach(agency => {
-    const opt = document.createElement('option');
-    opt.value = agency;
-    opt.textContent = agency;
-    agencySelect.appendChild(opt);
-  });
-
-  years.forEach(year => {
-    const opt = document.createElement('option');
-    opt.value = year;
-    opt.textContent = year;
-    yearSelect.appendChild(opt);
-  });
+// Helper to populate dropdown
+function populateDropdown(selector, values) {
+    const dropdown = document.querySelector(selector);
+    dropdown.innerHTML = "";
+    values.forEach(val => {
+        const option = document.createElement("option");
+        option.value = val;
+        option.text = val;
+        dropdown.appendChild(option);
+    });
 }
 
-function applyFilters(data) {
-  const agency = document.getElementById('agency-filter').value;
-  const year = document.getElementById('year-filter').value;
-
-  return data.filter(d => {
-    return (agency === 'All' || d.agency === agency) &&
-           (year === 'All' || d.launch_year === +year);
-  });
+// Filter based on dropdowns
+function filterData(data, agency, year) {
+    return data.filter(d => {
+        return (agency === "All" || d.agency === agency) &&
+               (year === "All" || d.launch_year == year);
+    });
 }
 
-function renderCharts(data) {
-  renderRocketChart(data);
-  renderBubbleChart(data);
-  renderBarChart(data);
+// Update all visualizations
+function updateVisuals(data) {
+    renderRocketLaunch(data);
+    renderBubbleChart(data);
+    renderBarChart(data);
 }
 
-function renderRocketChart(data) {
-  const svg = d3.select('#rocket-launch');
-  svg.selectAll('*').remove();
+// Rocket launch animation (circles rising)
+function renderRocketLaunch(data) {
+    d3.select("#rocketLaunch").html(""); // clear previous
 
-  svg.selectAll('circle')
-    .data(data)
-    .enter()
-    .append('circle')
-    .attr('cx', (_, i) => i * 30 + 20)
-    .attr('cy', 100)
-    .attr('r', 10)
-    .attr('fill', d => d.agency === 'NASA' ? 'blue' : 'red')
-    .transition()
-    .duration(2000)
-    .attr('cy', 20);
+    const width = 800;
+    const height = 120;
+
+    const svg = d3.select("#rocketLaunch")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    svg.selectAll("circle")
+        .data(data)
+        .enter()
+        .append("circle")
+        .attr("cx", (_, i) => 30 + i * 25)
+        .attr("cy", height)
+        .attr("r", 8)
+        .attr("fill", "red")
+        .transition()
+        .duration(2000)
+        .attr("cy", 20);
 }
 
+// Force Bubble Chart
 function renderBubbleChart(data) {
-  const svg = d3.select('#bubble-chart');
-  svg.selectAll('*').remove();
+    d3.select("#bubbleChart").html("");
 
-  const nodes = data.map((d, i) => ({
-    id: i,
-    r: 5 + Math.random() * 10,
-    agency: d.agency
-  }));
+    const width = 800;
+    const height = 400;
 
-  const simulation = d3.forceSimulation(nodes)
-    .force('charge', d3.forceManyBody().strength(5))
-    .force('center', d3.forceCenter(400, 200))
-    .force('collision', d3.forceCollide().radius(d => d.r + 1))
-    .on('tick', ticked);
+    const svg = d3.select("#bubbleChart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
 
-  const circles = svg.selectAll('circle')
-    .data(nodes)
-    .enter()
-    .append('circle')
-    .attr('r', d => d.r)
-    .attr('fill', d => d.agency === 'NASA' ? 'steelblue' : 'tomato');
+    const nodes = data.map(d => ({
+        radius: 5 + Math.random() * 10,
+        x: Math.random() * width,
+        y: Math.random() * height
+    }));
 
-  function ticked() {
-    circles
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y);
-  }
+    const simulation = d3.forceSimulation(nodes)
+        .force("charge", d3.forceManyBody().strength(2))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(d => d.radius))
+        .on("tick", ticked);
+
+    function ticked() {
+        const u = svg.selectAll("circle")
+            .data(nodes);
+
+        u.enter()
+            .append("circle")
+            .attr("r", d => d.radius)
+            .attr("fill", "tomato")
+            .merge(u)
+            .attr("cx", d => d.x)
+            .attr("cy", d => d.y);
+
+        u.exit().remove();
+    }
 }
 
+// Bar chart (Launches per year)
 function renderBarChart(data) {
-  const svg = d3.select('#bar-chart');
-  svg.selectAll('*').remove();
+    d3.select("#barChart").html("");
 
-  const launchCounts = d3.rollup(
-    data,
-    v => v.length,
-    d => d.launch_year
-  );
+    const width = 800;
+    const height = 300;
+    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
 
-  const entries = Array.from(launchCounts, ([year, count]) => ({ year, count }));
-  entries.sort((a, b) => a.year - b.year);
+    const grouped = d3.rollups(
+        data,
+        v => v.length,
+        d => d.launch_year
+    ).sort(([a], [b]) => a - b);
 
-  const margin = { top: 20, right: 30, bottom: 40, left: 40 },
-        width = +svg.attr('width') - margin.left - margin.right,
-        height = +svg.attr('height') - margin.top - margin.bottom;
+    const x = d3.scaleBand()
+        .domain(grouped.map(d => d[0]))
+        .range([margin.left, width - margin.right])
+        .padding(0.1);
 
-  const x = d3.scaleBand()
-    .domain(entries.map(d => d.year))
-    .range([0, width])
-    .padding(0.1);
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(grouped, d => d[1])])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(entries, d => d.count)])
-    .nice()
-    .range([height, 0]);
+    const svg = d3.select("#barChart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
 
-  const g = svg.append('g')
-    .attr('transform', `translate(${margin.left},${margin.top})`);
+    svg.selectAll("rect")
+        .data(grouped)
+        .enter()
+        .append("rect")
+        .attr("x", d => x(d[0]))
+        .attr("y", d => y(d[1]))
+        .attr("height", d => y(0) - y(d[1]))
+        .attr("width", x.bandwidth())
+        .attr("fill", "orange");
 
-  g.append('g')
-    .call(d3.axisLeft(y));
+    svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickSizeOuter(0));
 
-  g.append('g')
-    .attr('transform', `translate(0,${height})`)
-    .call(d3.axisBottom(x));
-
-  g.selectAll('.bar')
-    .data(entries)
-    .enter()
-    .append('rect')
-    .attr('class', 'bar')
-    .attr('x', d => x(d.year))
-    .attr('y', d => y(d.count))
-    .attr('width', x.bandwidth())
-    .attr('height', d => height - y(d.count))
-    .attr('fill', 'darkorange');
+    svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y));
 }
