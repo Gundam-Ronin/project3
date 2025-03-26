@@ -12,6 +12,14 @@ load_dotenv()
 CSV_FILE_PATH = r"C:\Users\Antho\OneDrive\Desktop\PROJECT 3\static\launch_data.csv"
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db")
 
+uses_netloc.append("postgres")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+
+if "sslmode" not in DATABASE_URL:
+    DATABASE_URL += "?sslmode=require"
+
 
 # Flask setup
 app = Flask(__name__)
