@@ -1,62 +1,45 @@
 import pandas as pd
 import psycopg2
-from sqlalchemy import create_engine
+from dotenv import load_dotenv
+import os
 
-# Connection string from Render PostgreSQL
-DATABASE_URL = "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a/launches_db"
+load_dotenv()
 
-# Load the CSV
-df = pd.read_csv("launch_data.csv")
+def load_csv_to_postgres():
+    conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+    cur = conn.cursor()
 
-# Clean + transform
-df = df.rename(columns={
-    'Company': 'company',
-    'Location': 'location',
-    'Date': 'launch_date',
-    'Rocket': 'rocket',
-    'Mission': 'mission',
-    'RocketStatus': 'rocket_status',
-    'MissionStatus': 'mission_status'
-})
+    df = pd.read_csv("static/js/launch_data.csv")
 
-# Convert to datetime
-df['launch_date'] = pd.to_datetime(df['launch_date'], errors='coerce')
+    # Optional: Drop incomplete rows
+    df = df.dropna(subset=["mission_name", "launch_date"])
 
-# Create 'launch_year' column
-df['launch_year'] = df['launch_date'].dt.year
+    # Clear old rows
+    cur.execute("DELETE FROM launches")
 
-# Add placeholders for expected columns in your DB
-expected_columns = [
-    'mission_name', 'success', 'failure_reason', 'price', 'source_id', 'agency'
-]
+    # Insert updated rows
+    for _, row in df.iterrows():
+        cur.execute("""
+            INSERT INTO launches (
+                mission_name, launch_date, launch_year,
+                agency, rocket, rocket_status,
+                location, success, failure_reason
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            row.get("mission_name"),
+            row.get("launch_date"),
+            int(row.get("launch_year")) if pd.notnull(row.get("launch_year")) else None,
+            row.get("agency"),
+            row.get("rocket"),
+            row.get("rocket_status"),
+            row.get("location"),
+            row.get("success"),
+            row.get("failure_reason")
+        ))
 
-for col in expected_columns:
-    df[col] = None
+    conn.commit()
+    cur.close()
+    conn.close()
 
-# Fill mission_name with 'mission' if available
-df['mission_name'] = df['mission']
-
-# Map success/failure
-df['success'] = df['mission_status'].map(lambda x: True if str(x).lower() == 'success' else (False if str(x).lower() == 'failure' else None))
-
-# Final cleanup
-columns_to_keep = [
-    'mission_name', 'company', 'launch_date', 'launch_year', 'location',
-    'mission', 'mission_status', 'price', 'rocket', 'rocket_status',
-    'source_id', 'success', 'failure_reason', 'agency'
-]
-
-df = df[columns_to_keep]
-
-# Connect and insert
-engine = create_engine(DATABASE_URL)
-
-# Replace this with your actual table name
-table_name = 'launches'
-
-with engine.connect() as conn:
-    # Optional: clean table before inserting if you want fresh load
-    # conn.execute(f"DELETE FROM {table_name}")
-    
-    df.to_sql(table_name, con=conn, if_exists='append', index=False)
-    print(f"✅ Loaded {len(df)} records into '{table_name}'")
+if __name__ == "__main__":
+    load_csv_to_postgres()
