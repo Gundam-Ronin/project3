@@ -77,12 +77,15 @@ def create_launches_table():
         """)
 
 # Load CSV (only in dev/local)
+from pathlib import Path
+
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
+
     csv_path = Path.cwd().parent / "static" / "launch_data.csv"
     df = pd.read_csv(csv_path)
 
-    with get_conn_cursor() as (_, cur):
+    with get_conn_cursor() as (conn, cur):
         insert_query = """
             INSERT INTO launches (
                 mission_name, launch_date, launch_year, success, failure_reason, agency,
@@ -91,20 +94,22 @@ def load_csv_to_postgres():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_id) DO NOTHING;
         """
-        def row_gen():
-            for _, row in df.iterrows():
-                yield (
-                    row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
-                    row.get("success"), row.get("failure_reason"), row.get("agency"),
-                    row.get("company"), row.get("location"), row.get("date"), row.get("time"),
-                    row.get("rocket"), row.get("mission"), row.get("rocket_status"),
-                    row.get("price"), row.get("mission_status"), row.get("source_id")
-                )
-        batch = iter(row_gen())
-        for chunk in iter(lambda: list(itertools.islice(batch, 100)), []):
-            cur.executemany(insert_query, chunk)
 
-    print("✅ CSV data loaded into PostgreSQL.")
+        values = [
+            (
+                row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
+                row.get("success"), row.get("failure_reason"), row.get("agency"),
+                row.get("company"), row.get("location"), row.get("date"), row.get("time"),
+                row.get("rocket"), row.get("mission"), row.get("rocket_status"),
+                row.get("price"), row.get("mission_status"), row.get("source_id")
+            )
+            for _, row in df.iterrows()
+        ]
+
+        cur.executemany(insert_query, values)
+
+    print("✅ CSV data loaded into Postgres.")
+
 
 # API routes
 @app.route("/")
