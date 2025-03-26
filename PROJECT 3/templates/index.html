@@ -3,14 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>NASA vs SpaceX Launch Dashboard</title>
-
-  <!-- ✅ Style sheet added -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-  <!-- ✅ D3 and scripts -->
+  <link rel="stylesheet" href="/static/style.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="{{ url_for('static', filename='js/collide.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/d3-tree.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
 </head>
 <body>
@@ -28,23 +22,13 @@
   </div>
 
   <section>
-    <h2>Rocket Launch Animation</h2>
-    <svg id="rocket-launch" width="800" height="200"></svg>
-  </section>
-
-  <section>
     <h2>Force Bubble Chart (Payload / Success)</h2>
-    <svg id="bubble-chart" width="800" height="400"></svg>
+    <svg id="bubble-chart" width="900" height="500"></svg>
   </section>
 
   <section>
     <h2>Launches per Year (Bar Chart)</h2>
-    <svg id="bar-chart" width="800" height="400"></svg>
-  </section>
-
-  <section>
-    <h2>Launches Tree Chart (Hierarchy View)</h2>
-    <svg id="tree-chart" width="800" height="400"></svg>
+    <svg id="bar-chart" width="900" height="500"></svg>
   </section>
 </body>
 </html>
