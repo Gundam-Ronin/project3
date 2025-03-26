@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,29 +13,33 @@
     <h1>NASA vs SpaceX Launch Dashboard</h1>
 
     <div class="filters">
-        <label for="agencyFilter">Filter by Agency:</label>
-        <select id="agencyFilter"></select>
+        <label for="agency-filter">Filter by Agency:</label>
+        <select id="agency-filter">
+            <option value="All">All</option>
+        </select>
 
-        <label for="yearFilter">Filter by Year:</label>
-        <select id="yearFilter"></select>
+        <label for="year-filter">Filter by Year:</label>
+        <select id="year-filter">
+            <option value="All">All</option>
+        </select>
 
-        <button id="applyFilters">Apply Filters</button>
-        <button id="resetFilters">Reset Filters</button>
+        <button id="apply-filters">Apply Filters</button>
+        <button id="reset-filters">Reset Filters</button>
     </div>
 
     <section>
         <h2>Rocket Launch Animation</h2>
-        <div id="rocketLaunch"></div>
+        <svg id="rocket-launch" width="800" height="200"></svg>
     </section>
 
     <section>
         <h2>Launch Force Bubble Chart</h2>
-        <div id="bubbleChart"></div>
+        <svg id="bubble-chart" width="800" height="400"></svg>
     </section>
 
     <section>
         <h2>Launches per Year (Bar Chart)</h2>
-        <div id="barChart"></div>
+        <svg id="bar-chart" width="800" height="400"></svg>
     </section>
 </body>
 </html>
