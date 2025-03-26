@@ -12,7 +12,7 @@ def load_csv_to_postgres():
     # Read CSV
     df = pd.read_csv("launch_data.csv")
 
-    # Rename columns to match DB schema
+    # Rename CSV columns to match DB schema
     df.rename(columns={
         "Mission": "mission_name",
         "Date": "launch_date",
@@ -29,7 +29,7 @@ def load_csv_to_postgres():
     # Clear old rows
     cur.execute("DELETE FROM launches")
 
-    # Insert each row
+    # ✅ THIS was missing:
     for _, row in df.iterrows():
         cur.execute("""
             INSERT INTO launches (
