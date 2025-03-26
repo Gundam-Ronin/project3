@@ -100,8 +100,8 @@ def api_get_launches():
 
 def initialize_app():
     create_launches_table()
-    if os.environ.get("FLASK_ENV") != "production":
-        load_csv_to_postgres()
+    load_csv_to_postgres()
+
 
 if __name__ == "__main__":
     initialize_app()
