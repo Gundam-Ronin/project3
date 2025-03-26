@@ -76,15 +76,13 @@ def create_launches_table():
             );
         """)
 
-from pathlib import Path
-
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
 
-    # Dynamically locate CSV based on notebook's location
-    base_dir = Path.cwd() / "static"
-    csv_path = base_dir / "launch_data.csv"
+    from pathlib import Path
 
+    base_dir = Path.cwd().parent / "static"
+    csv_path = base_dir / "launch_data.csv"
     print(f"Loading from path: {csv_path}")
 
     if not csv_path.exists():
