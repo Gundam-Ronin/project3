@@ -9,7 +9,7 @@ import pandas as pd
 load_dotenv()
 
 # Configuration
-CSV_FILE_PATH = "space_missions.csv"
+CSV_FILE_PATH = "static/data/launch_data.csv"
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db")
 
 
