@@ -1,3 +1,4 @@
+from urllib.parse import urlparse, uses_netloc
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from psycopg2 import pool
