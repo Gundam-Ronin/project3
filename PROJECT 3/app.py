@@ -82,11 +82,11 @@ from pathlib import Path
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
 
-    # ✅ Handle both script and notebook environments
     try:
         base_path = Path(__file__).parent
     except NameError:
-        base_path = Path().resolve()
+        # 👇 This is the fix: get the parent of the current working directory
+        base_path = Path().resolve().parent
 
     csv_path = base_path / "static" / "launch_data.csv"
     print(f"Loading from path: {csv_path}")
@@ -102,7 +102,6 @@ def load_csv_to_postgres():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_id) DO NOTHING;
         """
-
         values = [
             (
                 row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
