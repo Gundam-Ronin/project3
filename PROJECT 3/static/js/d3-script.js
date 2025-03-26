@@ -1,126 +1,70 @@
-document.addEventListener("DOMContentLoaded", () => {
-  fetch("/api/launches")
-    .then(response => response.json())
-    .then(data => {
-      setupDropdowns(data);
-      renderAll(data);
+function applyFilters(data) {
+  const agency = document.getElementById("agency-filter").value;
+  const year = document.getElementById("year-filter").value;
 
-      document.getElementById("apply-filters").addEventListener("click", () => {
-        const filtered = applyFilters(data);
-        renderAll(filtered);
-      });
+  return data.filter(d => {
+    const matchAgency = agency === "All" || d.agency === agency;
+    const matchYear = year === "All" || String(d.launch_year) === String(year);
+    return matchAgency && matchYear;
+  });
+}
 
-      document.getElementById("reset-filters").addEventListener("click", () => {
-        resetFilters();
-        renderAll(data);
-      });
-    });
+function resetFilters(data) {
+  document.getElementById("agency-filter").value = "All";
+  document.getElementById("year-filter").value = "All";
+  renderCharts(data);
+}
 
-  function setupDropdowns(data) {
-    const agencySelect = d3.select("#agency-filter");
-    const yearSelect = d3.select("#year-filter");
+function renderAll(data) {
+  renderCollideChart(data);
+}
 
-    const agencies = Array.from(new Set(data.map(d => d.agency))).sort();
-    const years = Array.from(new Set(data.map(d => d.launch_year))).sort((a, b) => a - b);
-
-    agencySelect.selectAll("option:not(:first-child)").remove();
-    yearSelect.selectAll("option:not(:first-child)").remove();
-
-    agencySelect.selectAll("option.agency")
-      .data(agencies)
-      .enter()
-      .append("option")
-      .attr("class", "agency")
-      .attr("value", d => d)
-      .text(d => d);
-
-    yearSelect.selectAll("option.year")
-      .data(years)
-      .enter()
-      .append("option")
-      .attr("class", "year")
-      .attr("value", d => d)
-      .text(d => d);
+function renderCharts(data) {
+  try {
+    renderAll(data);
+    renderBarChart(data);
+  } catch (err) {
+    console.error("Error in renderCharts:", err);
   }
+}
 
-  function applyFilters(data) {
-    const agency = document.getElementById("agency-filter").value;
-    const year = document.getElementById("year-filter").value;
+function renderBarChart(data) {
+  const svg = d3.select("#bar-chart");
+  const width = +svg.attr("width");
+  const height = +svg.attr("height");
+  svg.selectAll("*").remove();
 
-    return data.filter(d => {
-      const agencyMatch = agency === "All" || d.agency === agency;
-      const yearMatch = year === "All" || d.launch_year === parseInt(year);
-      return agencyMatch && yearMatch;
-    });
-  }
+  const yearCounts = d3.rollup(
+    data,
+    v => v.length,
+    d => d.launch_year
+  );
 
-  function resetFilters() {
-    document.getElementById("agency-filter").value = "All";
-    document.getElementById("year-filter").value = "All";
-  }
+  const x = d3.scaleBand()
+    .domain(Array.from(yearCounts.keys()))
+    .range([40, width - 20])
+    .padding(0.1);
 
-  function renderAll(data) {
-    renderRocketLaunch(data);
-    renderCollideChart(data);
-    renderTreeChart(data);
-  }
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(yearCounts.values())])
+    .range([height - 40, 20]);
 
-  function renderRocketLaunch(data) {
-    const svg = d3.select("#rocket-launch");
-    svg.selectAll("*").remove();
+  svg.append("g")
+    .selectAll("rect")
+    .data(Array.from(yearCounts.entries()))
+    .enter()
+    .append("rect")
+    .attr("x", d => x(d[0]))
+    .attr("y", d => y(d[1]))
+    .attr("width", x.bandwidth())
+    .attr("height", d => height - 40 - y(d[1]))
+    .attr("fill", "#1976d2");
 
-    const rocket = svg.append("text")
-      .attr("x", 10)
-      .attr("y", 100)
-      .attr("font-size", "32px")
-      .text("🚀 Rocket Launch Ready");
+  svg.append("g")
+    .attr("transform", `translate(0,${height - 40})`)
+    .call(d3.axisBottom(x));
 
-    rocket.transition()
-      .duration(2000)
-      .attr("x", 700)
-      .attr("y", 30)
-      .text("🚀 Launched!");
-  }
-
-  function renderTreeChart(data) {
-    d3.select("#tree-chart").selectAll("*").remove();
-
-    const hierarchyData = d3.group(data, d => d.agency, d => d.launch_year);
-    const root = d3.hierarchy({ values: Array.from(hierarchyData.entries()) }, d => d.values)
-      .sum(d => Array.isArray(d) ? 0 : 1);
-
-    const treeLayout = d3.tree().size([800, 400]);
-    treeLayout(root);
-
-    const svg = d3.select("#tree-chart");
-    svg.selectAll("*").remove();
-
-    svg.selectAll("line")
-      .data(root.links())
-      .enter()
-      .append("line")
-      .attr("x1", d => d.source.x)
-      .attr("y1", d => d.source.y)
-      .attr("x2", d => d.target.x)
-      .attr("y2", d => d.target.y)
-      .attr("stroke", "#ccc");
-
-    svg.selectAll("circle")
-      .data(root.descendants())
-      .enter()
-      .append("circle")
-      .attr("cx", d => d.x)
-      .attr("cy", d => d.y)
-      .attr("r", 5)
-      .attr("fill", "steelblue");
-
-    svg.selectAll("text")
-      .data(root.descendants())
-      .enter()
-      .append("text")
-      .attr("x", d => d.x + 5)
-      .attr("y", d => d.y - 5)
-      .text(d => d.data[0] || "")
-      .style("font-size", "10px");
-  }
-});
+  svg.append("g")
+    .attr("transform", `translate(40,0)`)
+    .call(d3.axisLeft(y));
+}
