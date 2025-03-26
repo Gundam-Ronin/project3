@@ -5,6 +5,8 @@
   <title>NASA vs SpaceX Launch Dashboard</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="{{ url_for('static', filename='js/collide.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/d3-tree.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
 </head>
 <body>
@@ -12,14 +14,10 @@
 
   <div class="filters">
     <label for="agency-filter">Filter by Agency:</label>
-    <select id="agency-filter">
-      <option value="All">All</option>
-    </select>
+    <select id="agency-filter"><option value="All">All</option></select>
 
     <label for="year-filter">Filter by Year:</label>
-    <select id="year-filter">
-      <option value="All">All</option>
-    </select>
+    <select id="year-filter"><option value="All">All</option></select>
 
     <button id="apply-filters">Apply</button>
     <button id="reset-filters">Reset</button>
@@ -27,17 +25,17 @@
 
   <section>
     <h2>Rocket Launch Animation</h2>
-    <svg id="rocket-launch" width="800" height="100"></svg>
+    <svg id="rocket-launch" width="800" height="200"></svg>
   </section>
 
   <section>
-    <h2>Force Bubble Collide Chart</h2>
+    <h2>Force Bubble Chart (Payload / Success)</h2>
     <svg id="bubble-chart" width="800" height="400"></svg>
   </section>
 
   <section>
-    <h2>Launch Tree Chart</h2>
-    <svg id="tree-chart" width="800" height="500"></svg>
+    <h2>Launches Tree Chart (Hierarchy View)</h2>
+    <svg id="tree-chart" width="800" height="400"></svg>
   </section>
 </body>
 </html>
