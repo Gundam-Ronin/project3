@@ -9,7 +9,8 @@ def load_csv_to_postgres():
     conn = psycopg2.connect(os.getenv("DATABASE_URL"))
     cur = conn.cursor()
 
-    df = pd.read_csv("static/js/launch_data.csv")
+    df = pd.read_csv("launch_data.csv")
+
 
     # Optional: Drop incomplete rows
     df = df.dropna(subset=["mission_name", "launch_date"])
