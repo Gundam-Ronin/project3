@@ -1,6 +1,0 @@
-flask
-psycopg2
-pandas
-flask-cors
-gunicorn
-
