@@ -1,117 +1,144 @@
-document.addEventListener("DOMContentLoaded", function () {
-    fetch("/api/launches")
-        .then(res => res.json())
-        .then(data => {
-            initDropdowns(data);
-            drawRocket();
-            updateCharts(data);
-        });
+// static/js/d3-script.js
 
-    document.getElementById("apply-filters").addEventListener("click", () => {
-        fetch("/api/launches")
-            .then(res => res.json())
-            .then(data => {
-                const agency = document.getElementById("agency-filter").value;
-                const year = document.getElementById("year-filter").value;
-                const filtered = data.filter(d =>
-                    (agency === "All" || d.agency === agency) &&
-                    (year === "All" || d.launch_year == year)
-                );
-                updateCharts(filtered);
-            });
+document.addEventListener("DOMContentLoaded", () => {
+  const agencyFilter = document.getElementById("agency-filter");
+  const yearFilter = document.getElementById("year-filter");
+  const applyFiltersBtn = document.getElementById("apply-filters");
+  const resetFiltersBtn = document.getElementById("reset-filters");
+
+  let allLaunches = [];
+
+  fetch("/api/launches")
+    .then(res => res.json())
+    .then(data => {
+      allLaunches = data;
+      populateFilters(data);
+      updateCharts(data);
     });
 
-    document.getElementById("reset-filters").addEventListener("click", () => {
-        fetch("/api/launches")
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById("agency-filter").value = "All";
-                document.getElementById("year-filter").value = "All";
-                updateCharts(data);
-            });
+  function populateFilters(data) {
+    const agencies = Array.from(new Set(data.map(d => d.agency))).sort();
+    const years = Array.from(new Set(data.map(d => d.launch_year))).sort();
+
+    agencies.forEach(agency => {
+      const opt = document.createElement("option");
+      opt.value = agency;
+      opt.textContent = agency;
+      agencyFilter.appendChild(opt);
     });
 
-    function initDropdowns(data) {
-        const agencies = Array.from(new Set(data.map(d => d.agency))).sort();
-        const years = Array.from(new Set(data.map(d => d.launch_year))).sort();
+    years.forEach(year => {
+      const opt = document.createElement("option");
+      opt.value = year;
+      opt.textContent = year;
+      yearFilter.appendChild(opt);
+    });
+  }
 
-        const agencySelect = d3.select("#agency-filter");
-        const yearSelect = d3.select("#year-filter");
+  function updateCharts(filteredData) {
+    drawRocketAnimation();
+    drawBubbleChart(filteredData);
+    drawBarChart(filteredData);
+  }
 
-        agencies.forEach(agency => {
-            agencySelect.append("option").text(agency).attr("value", agency);
-        });
+  applyFiltersBtn.addEventListener("click", () => {
+    const selectedAgency = agencyFilter.value;
+    const selectedYear = yearFilter.value;
 
-        years.forEach(year => {
-            yearSelect.append("option").text(year).attr("value", year);
-        });
+    const filtered = allLaunches.filter(d => {
+      return (selectedAgency === "All" || d.agency === selectedAgency) &&
+             (selectedYear === "All" || d.launch_year.toString() === selectedYear);
+    });
+
+    updateCharts(filtered);
+  });
+
+  resetFiltersBtn.addEventListener("click", () => {
+    agencyFilter.value = "All";
+    yearFilter.value = "All";
+    updateCharts(allLaunches);
+  });
+
+  function drawRocketAnimation() {
+    const svg = d3.select("#rocket-launch");
+    svg.selectAll("*").remove();
+
+    svg.append("text")
+      .attr("x", 100)
+      .attr("y", 100)
+      .text("🚀 Rocket Launch Ready")
+      .attr("font-size", "24px");
+  }
+
+  function drawBubbleChart(data) {
+    const svg = d3.select("#bubble-chart");
+    svg.selectAll("*").remove();
+
+    const width = +svg.attr("width");
+    const height = +svg.attr("height");
+
+    const scale = d3.scaleSqrt()
+      .domain([0, d3.max(data, d => d.payload_mass_kg || 1)])
+      .range([5, 40]);
+
+    const simulation = d3.forceSimulation(data)
+      .force("charge", d3.forceManyBody().strength(5))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide().radius(d => scale(d.payload_mass_kg || 1) + 2))
+      .on("tick", ticked);
+
+    const node = svg.selectAll("circle")
+      .data(data)
+      .enter()
+      .append("circle")
+      .attr("r", d => scale(d.payload_mass_kg || 1))
+      .attr("fill", d => d.success ? "green" : "red")
+      .attr("opacity", 0.7);
+
+    function ticked() {
+      node.attr("cx", d => d.x)
+          .attr("cy", d => d.y);
     }
+  }
 
-    function drawRocket() {
-        const svg = d3.select("#rocket-launch");
-        svg.append("rect").attr("width", 800).attr("height", 200).attr("fill", "#f4f4f4");
-        svg.append("text")
-            .attr("x", 400)
-            .attr("y", 100)
-            .attr("text-anchor", "middle")
-            .attr("font-size", "30px")
-            .text("🚀 Rocket Launch Ready");
-    }
+  function drawBarChart(data) {
+    const svg = d3.select("#bar-chart");
+    svg.selectAll("*").remove();
 
-    function updateCharts(data) {
-        drawBarChart(data);
-        drawBubbleChart(data);
-    }
+    const margin = { top: 20, right: 20, bottom: 40, left: 60 },
+          width = +svg.attr("width") - margin.left - margin.right,
+          height = +svg.attr("height") - margin.top - margin.bottom;
 
-    function drawBarChart(data) {
-        const svg = d3.select("#bar-chart").html("");
-        const width = +svg.attr("width");
-        const height = +svg.attr("height");
+    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-        const launchesPerYear = d3.rollups(data, v => v.length, d => d.launch_year).sort();
-        const x = d3.scaleBand().domain(launchesPerYear.map(d => d[0])).range([40, width - 20]).padding(0.1);
-        const y = d3.scaleLinear().domain([0, d3.max(launchesPerYear, d => d[1])]).range([height - 30, 20]);
+    const launchesByYear = d3.rollups(data, v => v.length, d => d.launch_year)
+      .sort((a, b) => d3.ascending(a[0], b[0]));
 
-        svg.selectAll(".bar")
-            .data(launchesPerYear)
-            .enter()
-            .append("rect")
-            .attr("x", d => x(d[0]))
-            .attr("y", d => y(d[1]))
-            .attr("width", x.bandwidth())
-            .attr("height", d => height - 30 - y(d[1]))
-            .attr("fill", "steelblue");
+    const x = d3.scaleBand()
+      .domain(launchesByYear.map(d => d[0]))
+      .range([0, width])
+      .padding(0.2);
 
-        svg.append("g").attr("transform", `translate(0,${height - 30})`).call(d3.axisBottom(x));
-        svg.append("g").attr("transform", `translate(40,0)`).call(d3.axisLeft(y));
-    }
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(launchesByYear, d => d[1])])
+      .nice()
+      .range([height, 0]);
 
-    function drawBubbleChart(data) {
-        const svg = d3.select("#bubble-chart").html("");
-        const width = +svg.attr("width");
-        const height = +svg.attr("height");
+    g.append("g")
+      .call(d3.axisLeft(y));
 
-        const simulation = d3.forceSimulation(data)
-            .force("charge", d3.forceManyBody().strength(5))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide().radius(20))
-            .on("tick", ticked);
+    g.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x));
 
-        const color = d => d.success === true ? "green" : d.success === false ? "red" : "gray";
-
-        const node = svg.selectAll("circle")
-            .data(data)
-            .enter()
-            .append("circle")
-            .attr("r", 8)
-            .attr("fill", color)
-            .append("title")
-            .text(d => `${d.mission_name} (${d.launch_year})`);
-
-        function ticked() {
-            svg.selectAll("circle")
-                .attr("cx", d => d.x)
-                .attr("cy", d => d.y);
-        }
-    }
+    g.selectAll("rect")
+      .data(launchesByYear)
+      .enter()
+      .append("rect")
+      .attr("x", d => x(d[0]))
+      .attr("y", d => y(d[1]))
+      .attr("width", x.bandwidth())
+      .attr("height", d => height - y(d[1]))
+      .attr("fill", "steelblue");
+  }
 });
