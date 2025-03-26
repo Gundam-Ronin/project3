@@ -11,6 +11,9 @@ from contextlib import contextmanager
 CSV_FILE_PATH = "space_missions.csv"  # use relative path
 DATABASE_URL = os.getenv("postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkSadpg-cvhmk4btq21c73f1hg1g-a/launches_db")
 
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 # Flask setup
 app = Flask(__name__, static_folder="static", template_folder="templates")
 CORS(app)
