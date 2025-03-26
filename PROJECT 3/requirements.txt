@@ -4,3 +4,4 @@ pandas
 flask-cors
 gunicorn
 requests
+python-dotenv
