@@ -1,40 +1,34 @@
-from urllib.parse import urlparse, uses_netloc
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from psycopg2 import pool
 from contextlib import contextmanager
-import os
 from dotenv import load_dotenv
 import pandas as pd
+import os
+from urllib.parse import uses_netloc
 
+# Load environment variables
 load_dotenv()
 
-# Configuration
-CSV_FILE_PATH = r"C:\Users\Antho\OneDrive\Desktop\PROJECT 3\static\launch_data.csv"
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db")
-
-import os
-from urllib.parse import urlparse, uses_netloc
+# Ensure psycopg2 recognizes 'postgres' scheme
 uses_netloc.append("postgres")
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-
-
+# Load and fix DATABASE_URL with SSL
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db"
+)
 if "sslmode" not in DATABASE_URL:
     DATABASE_URL += "?sslmode=require"
 
-
-from psycopg2 import pool
+# Initialize DB connection pool
 db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
-
 
 # Flask setup
 app = Flask(__name__)
 CORS(app)
 
-# Database connection pool
-db_pool = pool.SimpleConnectionPool(1, 10, DATABASE_URL)
-
+# Helper functions for DB access
 def get_db_connection():
     return db_pool.getconn()
 
@@ -55,7 +49,7 @@ def get_conn_cursor():
         cur.close()
         release_db_connection(conn)
 
-# Table creation
+# Create table if not exists
 def create_launches_table():
     with get_conn_cursor() as (conn, cur):
         cur.execute("""
@@ -80,10 +74,14 @@ def create_launches_table():
             );
         """)
 
-# Load CSV into PostgreSQL
+# Load CSV data to Postgres
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    df = pd.read_csv(r"C:\Users\Antho\OneDrive\Desktop\PROJECT 3\static\launch_data.csv")
+
+    # Use relative path for production
+    csv_path = os.path.join(os.path.dirname(__file__), 'static', 'launch_data.csv')
+    df = pd.read_csv(csv_path)
+
     with get_conn_cursor() as (conn, cur):
         insert_query = """
             INSERT INTO launches (
@@ -109,8 +107,7 @@ def load_csv_to_postgres():
 
     print("✅ CSV data loaded into Postgres.")
 
-
-# Route definitions
+# API routes
 @app.route("/")
 def dashboard():
     return render_template("index.html")
@@ -141,12 +138,12 @@ def api_get_stats():
         columns = [desc[0] for desc in cur.description]
         return jsonify([dict(zip(columns, row)) for row in rows])
 
-# Initialization function to use in Railway
+# Initialize for local dev
 def initialize_app():
     create_launches_table()
     load_csv_to_postgres()
 
-# Local development entrypoint
+# Entry point
 if __name__ == "__main__":
     initialize_app()
     app.run(debug=True)
