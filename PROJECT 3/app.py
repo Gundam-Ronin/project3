@@ -88,7 +88,7 @@ def load_csv_to_postgres():
         # 👇 This is the fix: get the parent of the current working directory
         base_path = Path().resolve().parent
 
-    csv_path = base_path / "static" / "launch_data.csv"
+    csv_path = Path().resolve().parent.parent / "static" / "launch_data.csv"
     print(f"Loading from path: {csv_path}")
 
     df = pd.read_csv(csv_path)
