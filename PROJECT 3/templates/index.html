@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>NASA vs SpaceX Launch Dashboard</title>
-    <script src="{{ url_for('static', filename='js/d3-script.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/collide.js') }}"></script>
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="{{ url_for('static', filename='js/collide.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
 </head>
 <body>
     <h1>NASA vs SpaceX Launch Dashboard</h1>
 
-    <div>
+    <div class="filters">
         <label for="agency-filter">Filter by Agency:</label>
         <select id="agency-filter">
             <option value="All">All</option>
@@ -23,14 +22,23 @@
             <option value="All">All</option>
         </select>
 
-        <button onclick="applyFilters()">Apply Filters</button>
-        <button onclick="resetFilters()">Reset Filters</button>
+        <button id="apply-filters">Apply Filters</button>
+        <button id="reset-filters">Reset Filters</button>
     </div>
 
-    <h2>Rocket Launch Animation</h2>
-    <svg id="rocket-launch" width="800" height="200"></svg>
+    <section>
+        <h2>Rocket Launch Animation</h2>
+        <svg id="rocket-launch" width="800" height="200"></svg>
+    </section>
 
-    <h2>Launch Force Bubble Chart</h2>
-    <svg id="bubble-chart" width="800" height="400"></svg>
+    <section>
+        <h2>Launch Force Bubble Chart</h2>
+        <svg id="bubble-chart" width="800" height="400"></svg>
+    </section>
+
+    <section>
+        <h2>Launches per Year (Bar Chart)</h2>
+        <svg id="bar-chart" width="800" height="400"></svg>
+    </section>
 </body>
 </html>
