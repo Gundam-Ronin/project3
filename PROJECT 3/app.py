@@ -9,7 +9,7 @@ from contextlib import contextmanager
 
 # Configuration
 CSV_FILE_PATH = "space_missions.csv"  # use relative path
-DATABASE_URL = os.getenv("postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkSadpg-cvhmk4btq21c73f1hg1g-a/launches_db")
+DATABASE_URL = os.getenv("postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a:5432/launches_db")
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
