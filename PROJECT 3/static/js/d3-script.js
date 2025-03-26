@@ -1,70 +1,52 @@
-function applyFilters(data) {
-  const agency = document.getElementById("agency-filter").value;
-  const year = document.getElementById("year-filter").value;
+async function renderAll() {
+  const response = await fetch("/api/launches");
+  const data = await response.json();
 
-  return data.filter(d => {
-    const matchAgency = agency === "All" || d.agency === agency;
-    const matchYear = year === "All" || String(d.launch_year) === String(year);
-    return matchAgency && matchYear;
+  renderCollideChart(data);
+  renderBarChart(data);
+  setupDropdowns(data);
+}
+
+function setupDropdowns(data) {
+  const agencySet = new Set(data.map(d => d.agency).filter(Boolean));
+  const yearSet = new Set(data.map(d => d.launch_year).filter(Boolean));
+
+  const agencyFilter = document.getElementById("agency-filter");
+  const yearFilter = document.getElementById("year-filter");
+
+  agencySet.forEach(agency => {
+    const option = document.createElement("option");
+    option.value = agency;
+    option.text = agency;
+    agencyFilter.add(option);
+  });
+
+  yearSet.forEach(year => {
+    const option = document.createElement("option");
+    option.value = year;
+    option.text = year;
+    yearFilter.add(option);
+  });
+
+  document.getElementById("apply-filters").addEventListener("click", () => {
+    const selectedAgency = agencyFilter.value;
+    const selectedYear = yearFilter.value;
+
+    const filtered = data.filter(d => {
+      return (selectedAgency === "All" || d.agency === selectedAgency) &&
+             (selectedYear === "All" || d.launch_year == selectedYear);
+    });
+
+    renderCollideChart(filtered);
+    renderBarChart(filtered);
+  });
+
+  document.getElementById("reset-filters").addEventListener("click", () => {
+    agencyFilter.value = "All";
+    yearFilter.value = "All";
+    renderCollideChart(data);
+    renderBarChart(data);
   });
 }
 
-function resetFilters(data) {
-  document.getElementById("agency-filter").value = "All";
-  document.getElementById("year-filter").value = "All";
-  renderCharts(data);
-}
-
-function renderAll(data) {
-  renderCollideChart(data);
-}
-
-function renderCharts(data) {
-  try {
-    renderAll(data);
-    renderBarChart(data);
-  } catch (err) {
-    console.error("Error in renderCharts:", err);
-  }
-}
-
-function renderBarChart(data) {
-  const svg = d3.select("#bar-chart");
-  const width = +svg.attr("width");
-  const height = +svg.attr("height");
-  svg.selectAll("*").remove();
-
-  const yearCounts = d3.rollup(
-    data,
-    v => v.length,
-    d => d.launch_year
-  );
-
-  const x = d3.scaleBand()
-    .domain(Array.from(yearCounts.keys()))
-    .range([40, width - 20])
-    .padding(0.1);
-
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(yearCounts.values())])
-    .range([height - 40, 20]);
-
-  svg.append("g")
-    .selectAll("rect")
-    .data(Array.from(yearCounts.entries()))
-    .enter()
-    .append("rect")
-    .attr("x", d => x(d[0]))
-    .attr("y", d => y(d[1]))
-    .attr("width", x.bandwidth())
-    .attr("height", d => height - 40 - y(d[1]))
-    .attr("fill", "#1976d2");
-
-  svg.append("g")
-    .attr("transform", `translate(0,${height - 40})`)
-    .call(d3.axisBottom(x));
-
-  svg.append("g")
-    .attr("transform", `translate(40,0)`)
-    .call(d3.axisLeft(y));
-}
+renderAll();
