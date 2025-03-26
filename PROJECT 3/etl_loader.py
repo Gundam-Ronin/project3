@@ -9,33 +9,45 @@ def load_csv_to_postgres():
     conn = psycopg2.connect(os.getenv("DATABASE_URL"))
     cur = conn.cursor()
 
+    # Read CSV
     df = pd.read_csv("launch_data.csv")
 
+    # Rename columns to match DB schema
+    df.rename(columns={
+        "Mission": "mission_name",
+        "Date": "launch_date",
+        "Company": "agency",
+        "Rocket": "rocket",
+        "RocketStatus": "rocket_status",
+        "Location": "location",
+        "MissionStatus": "mission_status"
+    }, inplace=True)
 
-    # Optional: Drop incomplete rows
-    df = df.dropna(subset=["Mission", "Date"])
-
-
+    # Drop rows missing key fields
+    df = df.dropna(subset=["mission_name", "launch_date"])
 
     # Clear old rows
-    cur.execute("""
-    INSERT INTO launches (
-        mission_name, launch_date, launch_year,
-        agency, rocket, rocket_status,
-        location, success, failure_reason
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-""", (
-    row.get("Mission"),
-    row.get("Date"),
-    pd.to_datetime(row.get("Date")).year if pd.notnull(row.get("Date")) else None,
-    row.get("Company"),
-    row.get("Rocket"),
-    row.get("RocketStatus"),
-    row.get("Location"),
-    1 if row.get("MissionStatus") == "Success" else 0,
-    None if row.get("MissionStatus") == "Success" else row.get("MissionStatus")
-))
+    cur.execute("DELETE FROM launches")
 
+    # Insert each row
+    for _, row in df.iterrows():
+        cur.execute("""
+            INSERT INTO launches (
+                mission_name, launch_date, launch_year,
+                agency, rocket, rocket_status,
+                location, success, failure_reason
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            row.get("mission_name"),
+            row.get("launch_date"),
+            pd.to_datetime(row.get("launch_date")).year if pd.notnull(row.get("launch_date")) else None,
+            row.get("agency"),
+            row.get("rocket"),
+            row.get("rocket_status"),
+            row.get("location"),
+            1 if row.get("mission_status") == "Success" else 0,
+            None if row.get("mission_status") == "Success" else row.get("mission_status")
+        ))
 
     conn.commit()
     cur.close()
