@@ -76,14 +76,15 @@ def create_launches_table():
             );
         """)
 
+from pathlib import Path
+
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
 
-    from pathlib import Path
-
-    base_dir = Path.cwd().parent / "static"
-    csv_path = base_dir / "launch_data.csv"
-    print(f"Loading from path: {csv_path}")
+    # Go up one directory from the Jupyter folder
+    base_path = Path.cwd().parent
+    csv_path = base_path / "static" / "launch_data.csv"
+    print(f"📄 Loading from path: {csv_path}")
 
     if not csv_path.exists():
         raise FileNotFoundError(f"❌ File not found at: {csv_path}")
@@ -99,7 +100,6 @@ def load_csv_to_postgres():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_id) DO NOTHING;
         """
-
         values = [
             (
                 row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
@@ -112,7 +112,7 @@ def load_csv_to_postgres():
         ]
         cur.executemany(insert_query, values)
 
-    print("✅ CSV data loaded into PostgreSQL.")
+    print("✅ CSV data loaded into Postgres.")
 
 
 
