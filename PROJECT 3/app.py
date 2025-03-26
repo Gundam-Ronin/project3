@@ -1,35 +1,37 @@
+from urllib.parse import uses_netloc
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from psycopg2 import pool
 from contextlib import contextmanager
-from dotenv import load_dotenv
-import pandas as pd
 import os
-from urllib.parse import uses_netloc
+import pandas as pd
+from dotenv import load_dotenv
+import itertools
 
-# Load environment variables
 load_dotenv()
 
-# Ensure psycopg2 recognizes 'postgres' scheme
+# Database connection
 uses_netloc.append("postgres")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Load and fix DATABASE_URL with SSL
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com:5432/launches_db"
-)
-if "sslmode" not in DATABASE_URL:
+# Force SSL if not included
+if DATABASE_URL and "sslmode" not in DATABASE_URL:
     DATABASE_URL += "?sslmode=require"
-
-# Initialize DB connection pool
-db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
 
 # Flask setup
 app = Flask(__name__)
 CORS(app)
 
-# Helper functions for DB access
+# Initialize pool later to prevent early connection in prod
+db_pool = None
+
+def init_db_pool():
+    global db_pool
+    if not db_pool:
+        db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+
 def get_db_connection():
+    init_db_pool()
     return db_pool.getconn()
 
 def release_db_connection(conn):
@@ -49,9 +51,9 @@ def get_conn_cursor():
         cur.close()
         release_db_connection(conn)
 
-# Create table if not exists
+# Create table
 def create_launches_table():
-    with get_conn_cursor() as (conn, cur):
+    with get_conn_cursor() as (_, cur):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS launches (
                 id SERIAL PRIMARY KEY,
@@ -74,16 +76,13 @@ def create_launches_table():
             );
         """)
 
-import os
-
+# Load CSV (only in dev/local)
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-
-    # Relative path that works on deployment
-    csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'launch_data.csv')
+    csv_path = os.path.join(os.getcwd(), 'static', 'launch_data.csv')
     df = pd.read_csv(csv_path)
-    
-    with get_conn_cursor() as (conn, cur):
+
+    with get_conn_cursor() as (_, cur):
         insert_query = """
             INSERT INTO launches (
                 mission_name, launch_date, launch_year, success, failure_reason, agency,
@@ -92,22 +91,20 @@ def load_csv_to_postgres():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_id) DO NOTHING;
         """
+        def row_gen():
+            for _, row in df.iterrows():
+                yield (
+                    row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
+                    row.get("success"), row.get("failure_reason"), row.get("agency"),
+                    row.get("company"), row.get("location"), row.get("date"), row.get("time"),
+                    row.get("rocket"), row.get("mission"), row.get("rocket_status"),
+                    row.get("price"), row.get("mission_status"), row.get("source_id")
+                )
+        batch = iter(row_gen())
+        for chunk in iter(lambda: list(itertools.islice(batch, 100)), []):
+            cur.executemany(insert_query, chunk)
 
-        values = [
-            (
-                row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
-                row.get("success"), row.get("failure_reason"), row.get("agency"),
-                row.get("company"), row.get("location"), row.get("date"), row.get("time"),
-                row.get("rocket"), row.get("mission"), row.get("rocket_status"),
-                row.get("price"), row.get("mission_status"), row.get("source_id")
-            )
-            for _, row in df.iterrows()
-        ]
-
-        cur.executemany(insert_query, values)
-
-    print("✅ CSV data loaded into Postgres.")
-
+    print("✅ CSV data loaded into PostgreSQL.")
 
 # API routes
 @app.route("/")
@@ -116,7 +113,7 @@ def dashboard():
 
 @app.route("/api/launches")
 def api_get_launches():
-    with get_conn_cursor() as (conn, cur):
+    with get_conn_cursor() as (_, cur):
         cur.execute("SELECT * FROM launches;")
         rows = cur.fetchall()
         columns = [desc[0] for desc in cur.description]
@@ -124,7 +121,7 @@ def api_get_launches():
 
 @app.route("/api/stats")
 def api_get_stats():
-    with get_conn_cursor() as (conn, cur):
+    with get_conn_cursor() as (_, cur):
         cur.execute("""
             SELECT
                 launch_year AS year,
@@ -140,12 +137,13 @@ def api_get_stats():
         columns = [desc[0] for desc in cur.description]
         return jsonify([dict(zip(columns, row)) for row in rows])
 
-# Initialize for local dev
+# Optional initialization
 def initialize_app():
     create_launches_table()
-    load_csv_to_postgres()
+    if os.environ.get("FLASK_ENV") != "production":
+        load_csv_to_postgres()
 
-# Entry point
+# Entrypoint
 if __name__ == "__main__":
     initialize_app()
     app.run(debug=True)
