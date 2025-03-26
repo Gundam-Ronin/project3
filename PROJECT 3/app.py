@@ -1,123 +1,90 @@
-from urllib.parse import uses_netloc
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, render_template
 from flask_cors import CORS
-from psycopg2 import pool
-from contextlib import contextmanager
-import os
 import pandas as pd
+import psycopg2
+from psycopg2 import pool
+import os
 from dotenv import load_dotenv
-import itertools
+from pathlib import Path
+from contextlib import contextmanager
 
 load_dotenv()
 
-# Database connection
-uses_netloc.append("postgres")
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-
-
-# Force SSL if not included
-if DATABASE_URL and "sslmode" not in DATABASE_URL:
-    DATABASE_URL += "?sslmode=require"
-
-# Flask setup
 app = Flask(__name__)
 CORS(app)
 
-# Initialize pool later to prevent early connection in prod
+# 🌐 Load DATABASE_URL with sslmode
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a/launches_db?sslmode=require")
+
+# 🧠 Global connection pool
 db_pool = None
 
 def init_db_pool():
     global db_pool
-    if not db_pool:
+    if db_pool is None:
         db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
 
 def get_db_connection():
-    init_db_pool()
+    if db_pool is None:
+        init_db_pool()
     return db_pool.getconn()
-
-def release_db_connection(conn):
-    db_pool.putconn(conn)
 
 @contextmanager
 def get_conn_cursor():
     conn = get_db_connection()
-    cur = conn.cursor()
     try:
-        yield conn, cur
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
+        yield conn, conn.cursor()
     finally:
-        cur.close()
-        release_db_connection(conn)
+        conn.commit()
+        conn.close()
 
-# Create table
 def create_launches_table():
+    create_query = """
+    CREATE TABLE IF NOT EXISTS launches (
+        id SERIAL PRIMARY KEY,
+        mission_name TEXT,
+        launch_date TEXT,
+        launch_year INT,
+        success BOOLEAN,
+        failure_reason TEXT,
+        agency TEXT,
+        source_id TEXT UNIQUE
+    );
+    """
     with get_conn_cursor() as (_, cur):
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS launches (
-                id SERIAL PRIMARY KEY,
-                mission_name TEXT,
-                launch_date DATE,
-                launch_year INT,
-                success BOOLEAN,
-                failure_reason TEXT,
-                agency TEXT,
-                company TEXT,
-                location TEXT,
-                date DATE,
-                time TIME,
-                rocket TEXT,
-                mission TEXT,
-                rocket_status TEXT,
-                price NUMERIC,
-                mission_status TEXT,
-                source_id TEXT UNIQUE
-            );
-        """)
-
-from pathlib import Path
+        cur.execute(create_query)
 
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-
-    # Go up one directory from the Jupyter folder
-    base_path = Path.cwd().parent
-    csv_path = base_path / "static" / "launch_data.csv"
-    print(f"📄 Loading from path: {csv_path}")
-
+    csv_path = Path("static/launch_data.csv")
     if not csv_path.exists():
-        raise FileNotFoundError(f"❌ File not found at: {csv_path}")
+        print(f"❌ CSV not found at {csv_path}")
+        return
 
     df = pd.read_csv(csv_path)
 
-    with get_conn_cursor() as (conn, cur):
+    with get_conn_cursor() as (_, cur):
         insert_query = """
-            INSERT INTO launches (
-                mission_name, launch_date, launch_year, success, failure_reason, agency,
-                company, location, date, time, rocket, mission,
-                rocket_status, price, mission_status, source_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source_id) DO NOTHING;
+        INSERT INTO launches (
+            mission_name, launch_date, launch_year, success,
+            failure_reason, agency, source_id
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source_id) DO NOTHING;
         """
-        values = [
-            (
-                row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
-                row.get("success"), row.get("failure_reason"), row.get("agency"),
-                row.get("company"), row.get("location"), row.get("date"), row.get("time"),
-                row.get("rocket"), row.get("mission"), row.get("rocket_status"),
-                row.get("price"), row.get("mission_status"), row.get("source_id")
-            )
-            for _, row in df.iterrows()
-        ]
-        cur.executemany(insert_query, values)
+        for _, row in df.iterrows():
+            cur.execute(insert_query, (
+                row['mission_name'],
+                row['launch_date'],
+                row['launch_year'],
+                row['success'],
+                row.get('failure_reason'),
+                row['agency'],
+                row['source_id']
+            ))
+    print("✅ Data loaded successfully.")
 
-    print("✅ CSV data loaded into Postgres.")
-
-
-
-# API routes
+# 🚀 API ROUTES
 @app.route("/")
 def dashboard():
     return render_template("index.html")
@@ -126,35 +93,16 @@ def dashboard():
 def api_get_launches():
     with get_conn_cursor() as (_, cur):
         cur.execute("SELECT * FROM launches;")
-        rows = cur.fetchall()
         columns = [desc[0] for desc in cur.description]
-        return jsonify([dict(zip(columns, row)) for row in rows])
+        data = [dict(zip(columns, row)) for row in cur.fetchall()]
+    return jsonify(data)
 
-@app.route("/api/stats")
-def api_get_stats():
-    with get_conn_cursor() as (_, cur):
-        cur.execute("""
-            SELECT
-                launch_year AS year,
-                agency,
-                COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE success) AS success_count
-            FROM launches
-            WHERE launch_year IS NOT NULL
-            GROUP BY year, agency
-            ORDER BY year, agency;
-        """)
-        rows = cur.fetchall()
-        columns = [desc[0] for desc in cur.description]
-        return jsonify([dict(zip(columns, row)) for row in rows])
-
-# Optional initialization
+# 🔁 INIT + RUN
 def initialize_app():
     create_launches_table()
     if os.environ.get("FLASK_ENV") != "production":
         load_csv_to_postgres()
 
-# Entrypoint
 if __name__ == "__main__":
     initialize_app()
     app.run(debug=True)
