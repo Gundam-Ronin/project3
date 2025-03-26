@@ -1,34 +1,44 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NASA vs SpaceX Launch Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css" />
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="{{ url_for('static', filename='js/d3-script.js') }}" defer></script>
 </head>
 <body>
-  <h1>NASA vs SpaceX Launch Dashboard</h1>
-
+  <h1>Government vs Private Sector Launch Dashboard</h1>
   <div class="filters">
-    <label for="agency-filter">Filter by Agency:</label>
-    <select id="agency-filter"><option value="All">All</option></select>
-
-    <label for="year-filter">Filter by Year:</label>
-    <select id="year-filter"><option value="All">All</option></select>
-
+    <label>Filter by Agency:</label>
+    <select id="agency-filter">
+      <option value="All">All</option>
+    </select>
+    <label>Filter by Year:</label>
+    <select id="year-filter">
+      <option value="All">All</option>
+    </select>
     <button id="apply-filters">Apply</button>
     <button id="reset-filters">Reset</button>
   </div>
 
   <section>
+    <h2>Rocket Launch Animation</h2>
+    <svg id="rocket-launch" width="800" height="200"></svg>
+  </section>
+
+  <section>
     <h2>Force Bubble Chart (Payload / Success)</h2>
-    <svg id="bubble-chart" width="900" height="500"></svg>
+    <svg id="bubble-chart" width="900" height="400"></svg>
   </section>
 
   <section>
     <h2>Launches per Year (Bar Chart)</h2>
-    <svg id="bar-chart" width="900" height="500"></svg>
+    <svg id="bar-chart" width="900" height="400"></svg>
   </section>
+
+  <script src="/static/js/collide.js"></script>
+  <script src="/static/js/d3-script.js"></script>
 </body>
 </html>
