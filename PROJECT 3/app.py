@@ -76,16 +76,22 @@ def create_launches_table():
             );
         """)
 
-# Load CSV (only in dev/local)
 from pathlib import Path
 
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    csv_path = Path(r"C:\Users\Antho\OneDrive\Desktop\PROJECT 3\static\launch_data.csv")
+
+    # Dynamically locate CSV based on notebook's location
+    base_dir = Path.cwd() / "static"
+    csv_path = base_dir / "launch_data.csv"
+
     print(f"Loading from path: {csv_path}")
-    
+
+    if not csv_path.exists():
+        raise FileNotFoundError(f"❌ File not found at: {csv_path}")
+
     df = pd.read_csv(csv_path)
-    
+
     with get_conn_cursor() as (conn, cur):
         insert_query = """
             INSERT INTO launches (
@@ -95,6 +101,7 @@ def load_csv_to_postgres():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_id) DO NOTHING;
         """
+
         values = [
             (
                 row.get("mission_name"), row.get("launch_date"), row.get("launch_year"),
@@ -106,8 +113,8 @@ def load_csv_to_postgres():
             for _, row in df.iterrows()
         ]
         cur.executemany(insert_query, values)
-    
-    print("✅ CSV data loaded into Postgres.")
+
+    print("✅ CSV data loaded into PostgreSQL.")
 
 
 
