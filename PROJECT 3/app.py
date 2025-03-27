@@ -13,10 +13,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Load database URL from environment or use fallback
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a/launches_db?sslmode=require")
+# Load database URL from environment
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://launches_db_user:GZpMv0pEPb5HUMWZEZyETL96vKacbkkS@dpg-cvhmk4btq21c73flhg1g-a.oregon-postgres.render.com/launches_db")
 
-# Global connection pool
+# Connection pool
 db_pool = None
 
 def init_db_pool():
@@ -49,24 +49,31 @@ def create_launches_table():
         failure_reason TEXT,
         agency TEXT,
         payload_mass_kg FLOAT,
-        source_id TEXT UNIQUE
+        source_id TEXT UNIQUE,
+        company TEXT,
+        location TEXT,
+        date DATE,
+        time TIME,
+        rocket TEXT,
+        mission TEXT,
+        rocket_status TEXT,
+        price TEXT,
+        mission_status TEXT
     );
     """
     with get_conn_cursor() as (_, cur):
         cur.execute(create_query)
 
-
-
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    csv_path = Path("launch_data.csv")
+    csv_path = Path("launch_data.csv")  # Use same directory as app.py
     if not csv_path.exists():
         print(f"❌ CSV not found at {csv_path}")
         return
 
     df = pd.read_csv(csv_path)
 
-    # 🛠️ Rename columns
+    # Rename columns to match DB
     df.rename(columns={
         "Mission": "mission_name",
         "Date": "launch_date",
@@ -78,19 +85,19 @@ def load_csv_to_postgres():
         "Price": "price"
     }, inplace=True)
 
-    # Derive additional fields
+    # Derive extra fields
     df["launch_year"] = pd.to_datetime(df["launch_date"], errors="coerce").dt.year
     df["success"] = df["mission_status"].str.lower().str.contains("success", na=False)
     df["failure_reason"] = df["mission_status"].where(~df["success"], None)
-    df["payload_mass_kg"] = 1000  # or use a real column if available
+    df["payload_mass_kg"] = 1000
     df["source_id"] = df["mission_name"].fillna("Unknown") + "_" + df["launch_date"].fillna("")
 
-    # Add missing fields if not in CSV
+    # Fill missing optional fields if needed
     for col in ["company", "date", "time"]:
         if col not in df.columns:
             df[col] = None
 
-    # Drop rows missing required data
+    # Drop incomplete rows
     df.dropna(subset=["mission_name", "launch_date", "launch_year", "agency"], inplace=True)
 
     with get_conn_cursor() as (_, cur):
@@ -98,7 +105,8 @@ def load_csv_to_postgres():
         INSERT INTO launches (
             mission_name, launch_date, launch_year, success,
             failure_reason, agency, payload_mass_kg, source_id,
-            company, location, date, time, rocket, mission, rocket_status, price, mission_status
+            company, location, date, time, rocket, mission,
+            rocket_status, price, mission_status
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source_id) DO NOTHING;
@@ -113,10 +121,10 @@ def load_csv_to_postgres():
                 row.get("agency"),
                 row.get("payload_mass_kg", 0),
                 row.get("source_id"),
-                row.get("agency"),  # reused as company if needed
+                row.get("agency"),
                 row.get("location"),
                 row.get("launch_date"),
-                row.get("Time"),  # from CSV if capitalized
+                row.get("Time"),
                 row.get("rocket"),
                 row.get("mission_name"),
                 row.get("rocket_status"),
@@ -125,9 +133,6 @@ def load_csv_to_postgres():
             ))
 
     print("✅ Data loaded successfully.")
-
-
-
 
 @app.route("/")
 def dashboard():
@@ -144,7 +149,6 @@ def api_get_launches():
 def initialize_app():
     create_launches_table()
     load_csv_to_postgres()
-
 
 if __name__ == "__main__":
     initialize_app()
