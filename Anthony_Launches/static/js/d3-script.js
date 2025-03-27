@@ -1,121 +1,108 @@
-document.addEventListener("DOMContentLoaded", () => {
-  fetch("/api/launches")
-    .then(response => response.json())
-    .then(data => renderAll(data))
-    .catch(error => console.error("Data load error:", error));
-});
+let launchData = [];
 
-function renderAll(data) {
-  const cleanData = data.filter(d =>
-    d.launch_year !== null &&
-    d.company !== null &&
-    d.mission_status !== null
-  );
+function buildMetadata(company) {
+  const launches = launchData.filter(d => d.company === company);
+  const total = launches.length;
+  const successes = launches.filter(d => d.mission_status.toLowerCase().includes("success")).length;
+  const years = launches.map(d => d.launch_year);
+  const mostRecent = Math.max(...years);
 
-  renderPlotlyBarChart(cleanData);
-  renderPlotlyBubbleChart(cleanData);
-  renderPlotlySankey(cleanData);
+  const panel = d3.select("#metadata-panel");
+  panel.html("");
+  panel.append("p").text(`Total Launches: ${total}`);
+  panel.append("p").text(`Successful Launches: ${successes}`);
+  panel.append("p").text(`Most Recent Year: ${mostRecent}`);
 }
 
-function renderPlotlyBarChart(data) {
-  const grouped = d3.rollup(
-    data,
-    v => ({
-      success: v.filter(d => d.mission_status.toLowerCase().includes("success")).length,
-      failure: v.filter(d => !d.mission_status.toLowerCase().includes("success")).length
-    }),
-    d => +d.launch_year
+function buildCharts(company) {
+  const launches = launchData.filter(d => d.company === company);
+
+  const countsByYear = d3.rollup(
+    launches,
+    v => v.length,
+    d => d.launch_year
   );
 
-  const years = Array.from(grouped.keys()).sort();
-  const success = years.map(y => grouped.get(y).success);
-  const failure = years.map(y => grouped.get(y).failure);
+  const years = Array.from(countsByYear.keys()).sort();
+  const values = years.map(year => countsByYear.get(year));
 
-  const trace1 = { x: years, y: success, name: 'Success', type: 'bar', marker: { color: '#4CAF50' } };
-  const trace2 = { x: years, y: failure, name: 'Failure', type: 'bar', marker: { color: '#F44336' } };
+  const barTrace = {
+    x: values,
+    y: years.map(y => `Year ${y}`),
+    type: "bar",
+    orientation: "h"
+  };
 
-  Plotly.newPlot("bar-chart", [trace1, trace2], {
-    barmode: 'group',
-    title: 'Launches by Year',
-    xaxis: { title: 'Year' },
-    yaxis: { title: 'Number of Launches' }
-  });
-}
-
-function renderPlotlyBubbleChart(data) {
-  const grouped = d3.rollup(
-    data,
-    v => ({
-      count: v.length,
-      successRate: v.filter(d => d.mission_status.toLowerCase().includes("success")).length / v.length
-    }),
-    d => d.company,
-    d => +d.launch_year
-  );
-
-  const bubbles = [];
-  Array.from(grouped.entries()).forEach(([company, years]) => {
-    Array.from(years.entries()).forEach(([year, stat]) => {
-      bubbles.push({
-        x: year,
-        y: company,
-        text: `${company} (${year}) Success Rate: ${(stat.successRate * 100).toFixed(1)}%`,
-        marker: {
-          size: stat.count * 4,
-          color: stat.successRate,
-          colorscale: "Viridis",
-          showscale: true
-        }
-      });
-    });
+  Plotly.newPlot("bar", [barTrace], {
+    title: `Launches Per Year (${company})`,
+    margin: { t: 40, l: 80 }
   });
 
-  Plotly.newPlot("bubble-chart", [{
-    type: "scatter",
+  const bubbleTrace = {
+    x: launches.map(d => d.launch_year),
+    y: launches.map((_, i) => i + 1),
+    text: launches.map(d => d.mission_status),
     mode: "markers",
-    x: bubbles.map(b => b.x),
-    y: bubbles.map(b => b.y),
-    text: bubbles.map(b => b.text),
-    marker: bubbles.map(b => b.marker)
-  }], {
-    title: "Launches by Company and Year",
-    xaxis: { title: "Year" },
-    yaxis: { title: "Company" }
-  });
-}
-
-function renderPlotlySankey(data) {
-  const companies = Array.from(new Set(data.map(d => d.company)));
-  const statuses = Array.from(new Set(data.map(d => d.mission_status)));
-  const labels = [...companies, ...statuses];
-  const index = label => labels.indexOf(label);
-
-  const linkMap = new Map();
-  data.forEach(d => {
-    const key = `${d.company}→${d.mission_status}`;
-    linkMap.set(key, (linkMap.get(key) || 0) + 1);
-  });
-
-  const links = Array.from(linkMap.entries()).map(([k, v]) => {
-    const [source, target] = k.split("→");
-    return { source: index(source), target: index(target), value: v };
-  });
-
-  Plotly.newPlot("sankey-chart", [{
-    type: "sankey",
-    orientation: "h",
-    node: {
-      pad: 15,
-      thickness: 20,
-      line: { color: "black", width: 0.5 },
-      label: labels
-    },
-    link: {
-      source: links.map(l => l.source),
-      target: links.map(l => l.target),
-      value: links.map(l => l.value)
+    marker: {
+      size: launches.map((_, i) => i + 1),
+      color: launches.map(d => d.launch_year),
+      colorscale: "Viridis"
     }
-  }], {
-    title: "Company to Mission Outcome Flow"
+  };
+
+  Plotly.newPlot("bubble", [bubbleTrace], {
+    title: "Launch Activity",
+    xaxis: { title: "Launch Year" },
+    yaxis: { title: "Count Index" }
   });
 }
+
+function init() {
+  d3.json("/api/launches").then(data => {
+    const companies = [...new Set(data.map(d => d.company))];
+    const dropdown = d3.select("#selCompany");
+
+    companies.forEach(company => {
+      dropdown.append("option").text(company).property("value", company);
+    });
+
+    const first = companies[0];
+    buildBarChart(data, first);
+    buildBubbleChart(data, first);
+    buildPieChart(data, first);   // ✅ new
+    showMetadata(data, first);
+  });
+}
+
+function optionChanged(company) {
+  d3.json("/api/launches").then(data => {
+    buildBarChart(data, company);
+    buildBubbleChart(data, company);
+    buildPieChart(data, company);   // ✅ new
+    showMetadata(data, company);
+  });
+}
+
+function optionChanged(company) {
+  buildMetadata(company);
+  buildCharts(company);
+}
+
+function init() {
+  d3.json("/api/launches").then(data => {
+    launchData = data;
+
+    const dropdown = d3.select("#selCompany");
+    const companies = Array.from(new Set(data.map(d => d.company))).sort();
+
+    companies.forEach(c => {
+      dropdown.append("option").text(c).property("value", c);
+    });
+
+    const first = companies[0];
+    buildMetadata(first);
+    buildCharts(first);
+  });
+}
+
+init();
