@@ -15,16 +15,13 @@ CORS(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ✅ Initialize later (lazy)
+# ✅ Don't initialize here
 db_pool = None
 
 def init_db_pool():
     global db_pool
     if db_pool is None:
-        db_pool = pool.SimpleConnectionPool(
-            1, 10,
-            dsn=DATABASE_URL,
-        )
+        db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
 
 def get_db_connection():
     if db_pool is None:
