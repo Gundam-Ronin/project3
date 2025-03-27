@@ -13,7 +13,7 @@ load_dotenv()
 app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folder="Anthony_Launches/static")
 CORS(app)
 
-#DEFINE DATABASE_URL 
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
@@ -28,6 +28,7 @@ db_pool = pool.SimpleConnectionPool(
     sslcert=None,
     sslkey=None
 )
+
 
 def init_db_pool():
     global db_pool
@@ -100,8 +101,19 @@ def api_get_launches():
         data = [dict(zip(columns, row)) for row in cur.fetchall()]
     return jsonify(data)
 
+@app.route("/load-data")
+def load_data_manually():
+    create_launches_table()
+    load_csv_to_postgres()
+    return "✅ Launch data loaded successfully!"
+
+
 def initialize_app():
     create_launches_table()
     load_csv_to_postgres()
 
+if __name__ == "__main__":
+    if os.getenv("FLASK_ENV") == "development":
+        initialize_app()
+    app.run(debug=True)
 
