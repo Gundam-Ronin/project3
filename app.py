@@ -7,33 +7,23 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 from contextlib import contextmanager
-import ssl
 
 load_dotenv()
 
-app = Flask(
-    __name__,
-    template_folder="Anthony_Launches/templates",
-    static_folder="Anthony_Launches/static"
-)
+app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folder="Anthony_Launches/static")
 CORS(app)
 
+# PostgreSQL connection string from Render environment
 DATABASE_URL = os.getenv("DATABASE_URL")
-db_pool = None  # Lazy init
 
-# ✅ FIXED: Safe SSL-compatible DB pool for Render
+# Lazy-loaded connection pool
+db_pool = None
+
 def init_db_pool():
     global db_pool
     if db_pool is None:
         print("🔄 Initializing DB connection pool...")
-        db_pool = pool.SimpleConnectionPool(
-            1, 10,
-            dsn=DATABASE_URL,
-            sslmode='require',         # Required by Render
-            sslrootcert=None,
-            sslcert=None,
-            sslkey=None
-        )
+        db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
 
 def get_db_connection():
     if db_pool is None:
@@ -95,19 +85,27 @@ def dashboard():
 
 @app.route("/api/launches")
 def api_get_launches():
-    with get_conn_cursor() as (_, cur):
-        cur.execute("SELECT company, launch_year, mission_status FROM launches;")
-        columns = [desc[0] for desc in cur.description]
-        data = [dict(zip(columns, row)) for row in cur.fetchall()]
-    return jsonify(data)
+    try:
+        with get_conn_cursor() as (_, cur):
+            cur.execute("SELECT company, launch_year, mission_status FROM launches;")
+            columns = [desc[0] for desc in cur.description]
+            data = [dict(zip(columns, row)) for row in cur.fetchall()]
+        return jsonify(data)
+    except Exception as e:
+        print("❌ /api/launches failed:", e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/load-data")
 def load_data_manually():
-    create_launches_table()
-    load_csv_to_postgres()
-    return "✅ Launch data loaded successfully!"
+    try:
+        create_launches_table()
+        load_csv_to_postgres()
+        return "✅ Launch data loaded successfully!"
+    except Exception as e:
+        print("❌ /load-data failed:", e)
+        return f"❌ Failed: {e}", 500
 
-# Optional ping route for Render debugging
+# Optional: for testing DB connection only
 @app.route("/ping-db")
 def ping_db():
     try:
@@ -115,7 +113,7 @@ def ping_db():
             cur.execute("SELECT 1;")
         return "✅ DB connection successful!"
     except Exception as e:
-        return f"❌ DB connection failed: {e}"
+        return f"❌ DB connection failed: {e}", 500
 
 def initialize_app():
     create_launches_table()
