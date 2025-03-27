@@ -66,7 +66,7 @@ def create_launches_table():
 
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    csv_path = Path("launch_data.csv")  # Use same directory as app.py
+    csv_path = Path("launch_data.csv")  # or static/launch_data.csv depending on where your file is
     if not csv_path.exists():
         print(f"❌ CSV not found at {csv_path}")
         return
@@ -85,19 +85,25 @@ def load_csv_to_postgres():
         "Price": "price"
     }, inplace=True)
 
-    # Derive extra fields
+    # Derive additional fields
     df["launch_year"] = pd.to_datetime(df["launch_date"], errors="coerce").dt.year
     df["success"] = df["mission_status"].str.lower().str.contains("success", na=False)
     df["failure_reason"] = df["mission_status"].where(~df["success"], None)
-    df["payload_mass_kg"] = 1000
+    df["payload_mass_kg"] = 1000  # placeholder
     df["source_id"] = df["mission_name"].fillna("Unknown") + "_" + df["launch_date"].fillna("")
 
-    # Fill missing optional fields if needed
-    for col in ["company", "date", "time"]:
+    # Fix Time column to ensure compatibility with SQL time type
+    if "Time" in df.columns:
+        df["Time"] = pd.to_datetime(df["Time"], errors="coerce").dt.time
+    else:
+        df["Time"] = None
+
+    # Fill optional fields if not in CSV
+    for col in ["company", "date"]:
         if col not in df.columns:
             df[col] = None
 
-    # Drop incomplete rows
+    # Drop bad rows
     df.dropna(subset=["mission_name", "launch_date", "launch_year", "agency"], inplace=True)
 
     with get_conn_cursor() as (_, cur):
@@ -124,7 +130,7 @@ def load_csv_to_postgres():
                 row.get("agency"),
                 row.get("location"),
                 row.get("launch_date"),
-                row.get("Time"),
+                row.get("Time"),  # Now safely cast as SQL-compatible time object
                 row.get("rocket"),
                 row.get("mission_name"),
                 row.get("rocket_status"),
@@ -134,6 +140,7 @@ def load_csv_to_postgres():
 
     print("✅ Data loaded successfully.")
 
+    
 @app.route("/")
 def dashboard():
     return render_template("index.html")
