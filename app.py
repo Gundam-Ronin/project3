@@ -1,80 +1,98 @@
-from flask import Flask, jsonify, render_template
-from flask_cors import CORS
-import psycopg2
+from flask import Flask, jsonify, request, render_template
 import pandas as pd
+import psycopg2
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
 import os
+from dotenv import load_dotenv
 
-app = Flask(__name__)
-CORS(app)
+load_dotenv()
 
-# Local PostgreSQL connection config
-DB_NAME = "space_db"
-DB_USER = "postgres"
-DB_PASSWORD = "your_password_here"
-DB_HOST = "localhost"
-DB_PORT = "5432"
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
+# PostgreSQL connection config (local setup)
+DB_NAME = os.getenv("DB_NAME", "launches_db")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "your_password")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
 
-def get_connection():
-    return psycopg2.connect(
+def get_db_connection():
+    conn = psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
         host=DB_HOST,
         port=DB_PORT
     )
-
+    return conn
 
 @app.route("/")
-def home():
+def index():
     return render_template("index.html")
 
-
 @app.route("/api/launches")
-def api_launches():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
+def get_launches():
+    company = request.args.get("company")
+    status = request.args.get("status")
 
-        cursor.execute("SELECT * FROM launches")
-        cols = [desc[0] for desc in cursor.description]
-        rows = cursor.fetchall()
-        data = [dict(zip(cols, row)) for row in rows]
+    query = "SELECT company, launch_year, mission_status FROM launches"
+    filters = []
+    params = []
 
-        cursor.close()
-        conn.close()
+    if company:
+        filters.append("company = %s")
+        params.append(company)
+    if status:
+        filters.append("mission_status = %s")
+        params.append(status)
 
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    if filters:
+        query += " WHERE " + " AND ".join(filters)
 
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute(query, params)
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
 
-@app.route("/api/filters")
-def api_filters():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
+    return jsonify(results)
 
-        cursor.execute("SELECT DISTINCT agency FROM launches ORDER BY agency")
-        agencies = [row[0] for row in cursor.fetchall()]
+@app.route("/load-data")
+def load_data():
+    csv_path = "launch_data.csv"
+    if not os.path.exists(csv_path):
+        return "CSV not found", 404
 
-        cursor.execute("SELECT DISTINCT launch_year FROM launches ORDER BY launch_year")
-        years = [row[0] for row in cursor.fetchall()]
+    df = pd.read_csv(csv_path)
+    df = df[["Company", "Date", "MissionStatus"]].dropna()
+    df["launch_year"] = pd.to_datetime(df["Date"], errors="coerce").dt.year
+    df = df.dropna(subset=["launch_year"])
 
-        cursor.execute("SELECT DISTINCT success FROM launches")
-        outcomes = [row[0] for row in cursor.fetchall()]
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-        cursor.close()
-        conn.close()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS launches (
+            id SERIAL PRIMARY KEY,
+            company TEXT,
+            launch_year INT,
+            mission_status TEXT
+        )
+    """)
 
-        return jsonify({
-            "agencies": agencies,
-            "years": years,
-            "outcomes": outcomes
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    for _, row in df.iterrows():
+        cur.execute("""
+            INSERT INTO launches (company, launch_year, mission_status)
+            VALUES (%s, %s, %s)
+        """, (row["Company"], int(row["launch_year"]), row["MissionStatus"]))
 
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return "✅ Launch data loaded into database!"
 
 if __name__ == "__main__":
     app.run(debug=True)
