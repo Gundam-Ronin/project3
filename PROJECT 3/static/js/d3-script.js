@@ -13,7 +13,7 @@ function renderAll(data) {
     d.mission_name !== null &&
     d.success !== null
   );
-
+  console.log("data=", data );
   renderCollideChart(cleanData);  // Bubble chart (from collide.js)
   renderBarChart(cleanData);      // Bar chart (below)
 }
@@ -78,4 +78,4 @@ function renderBarChart(data) {
     .call(d3.axisLeft(y));
 }
 
-console.log("data=", data )
+
