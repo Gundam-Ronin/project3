@@ -14,43 +14,46 @@ app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folde
 CORS(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+db_pool = None
 
-db_pool = None  # Lazily initialized
-
+# 🔒 Set this to 'require' if Render DB needs SSL
+USE_SSL = True
 
 def init_db_pool():
     global db_pool
-    if db_pool is None:
-        print("🔄 Initializing DB connection pool...")
-        try:
-            db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
-        except Exception as e:
-            print(f"❌ DB connection failed: {e}")
-            db_pool = None
+    print("🔄 Initializing DB connection pool...")
+    try:
+        db_pool_args = {"dsn": DATABASE_URL}
+        if USE_SSL:
+            db_pool_args.update({
+                "sslmode": "require"
+            })
 
+        db_pool = pool.SimpleConnectionPool(1, 10, **db_pool_args)
+        print("✅ DB pool initialized.")
+    except Exception as e:
+        print(f"❌ DB connection failed: {e}")
+        db_pool = None
 
 def get_db_connection():
     global db_pool
     if db_pool is None:
         init_db_pool()
-    if db_pool:
-        return db_pool.getconn()
-    else:
-        raise ConnectionError("Database pool is not available")
-
+    return db_pool.getconn() if db_pool else None
 
 @contextmanager
 def get_conn_cursor():
     conn = get_db_connection()
+    if conn is None:
+        raise Exception("Database pool is not available")
     try:
         yield conn, conn.cursor()
     finally:
         conn.commit()
         conn.close()
 
-
 def create_launches_table():
-    query = """
+    create_query = """
     CREATE TABLE IF NOT EXISTS launches (
         id SERIAL PRIMARY KEY,
         company TEXT,
@@ -59,8 +62,7 @@ def create_launches_table():
     );
     """
     with get_conn_cursor() as (_, cur):
-        cur.execute(query)
-
+        cur.execute(create_query)
 
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
@@ -87,13 +89,12 @@ def load_csv_to_postgres():
                 int(row["launch_year"]),
                 row["mission_status"]
             ))
-    print("✅ Data loaded successfully.")
 
+    print("✅ Data loaded successfully.")
 
 @app.route("/")
 def dashboard():
     return render_template("index.html")
-
 
 @app.route("/api/launches")
 def api_get_launches():
@@ -105,8 +106,7 @@ def api_get_launches():
         return jsonify(data)
     except Exception as e:
         print(f"❌ /api/launches failed: {e}")
-        return jsonify({"error": "Failed to fetch launch data"}), 500
-
+        return jsonify({"error": "Failed to fetch launches"}), 500
 
 @app.route("/load-data")
 def load_data_manually():
@@ -115,17 +115,12 @@ def load_data_manually():
         load_csv_to_postgres()
         return "✅ Launch data loaded successfully!"
     except Exception as e:
-        print(f"❌ Data load failed: {e}")
-        return f"Error loading data: {e}", 500
-
+        print(f"❌ Failed to load data: {e}")
+        return f"❌ Error loading data: {e}", 500
 
 def initialize_app():
-    try:
-        create_launches_table()
-        load_csv_to_postgres()
-    except Exception as e:
-        print(f"❌ Initial load error: {e}")
-
+    create_launches_table()
+    load_csv_to_postgres()
 
 if __name__ == "__main__":
     if os.getenv("FLASK_ENV") == "development":
