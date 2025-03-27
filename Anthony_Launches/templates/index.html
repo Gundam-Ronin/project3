@@ -2,30 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Launch Dashboard (Plotly)</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <title>Launch Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
 </head>
 <body>
-  <h1>Launch Dashboard</h1>
+  <div class="container">
+    <h1 class="text-center mt-4">🚀 Launch Dashboard</h1>
+    <p class="text-center">Explore historical launches by company</p>
 
-  <section>
-    <h2>Plotly Bar Chart</h2>
-    <div id="bar-chart" style="width: 900px; height: 400px;"></div>
-  </section>
+    <div class="row">
+      <!-- Left panel -->
+      <div class="col-md-3">
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Select a Company:</h5>
+            <select id="selCompany" class="form-select" onchange="optionChanged(this.value)"></select>
+          </div>
+        </div>
 
-  <section>
-    <h2>Plotly Bubble Chart</h2>
-    <div id="bubble-chart" style="width: 900px; height: 400px;"></div>
-  </section>
+        <div class="card">
+          <div class="card-header bg-light">📊 Metadata</div>
+          <div class="card-body" id="metadata-panel"></div>
+        </div>
+      </div>
 
-  <section>
-    <h2>Plotly Sankey Diagram</h2>
-    <div id="sankey-chart" style="width: 900px; height: 400px;"></div>
-  </section>
+      <!-- Right panel -->
+      <div class="col-md-9">
+        <div id="bar" class="mb-4"></div>
+        <div id="bubble" class="mb-4"></div>
+        <div id="pie" class="mb-4"></div>
+      </div>
+    </div>
+  </div>
 
-  <script src="/static/js/d3-script.js"></script>
+  <!-- JS Libraries -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="/static/js/app.js"></script>
 </body>
 </html>
