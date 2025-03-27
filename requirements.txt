@@ -3,3 +3,4 @@ flask-cors
 psycopg2-binary
 pandas
 python-dotenv
+gunicorn
