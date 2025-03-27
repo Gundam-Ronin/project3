@@ -1,134 +1,95 @@
-document.addEventListener("DOMContentLoaded", function () {
-  const companySelect = document.getElementById("companySelect");
-  const yearSelect = document.getElementById("yearSelect");
 
-  fetch("/api/launches")
-    .then((res) => res.json())
-    .then((data) => {
-      populateFilters(data);
-      plotCharts(data);
-    });
-
+document.addEventListener("DOMContentLoaded", () => {
+    fetch("/api/launches")
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) {
+          console.error("Expected array but got:", data);
+          return;
+        }
+        populateFilters(data);
+        buildCharts(data);
+      })
+      .catch(err => console.error("Fetch failed", err));
+  });
+  
   function populateFilters(data) {
-    const companies = new Set();
+    const yearSelect = document.getElementById("yearSelect");
+    const companySelect = document.getElementById("companySelect");
+  
     const years = new Set();
-
-    data.forEach((launch) => {
-      if (launch.agency) companies.add(launch.agency);
-      if (launch.launch_year) years.add(launch.launch_year);
+    const companies = new Set();
+  
+    data.forEach(d => {
+      if (d.launch_year) years.add(d.launch_year);
+      if (d.agency) companies.add(d.agency);
     });
-
-    [...companies].sort().forEach((company) => {
-      const opt = document.createElement("option");
-      opt.value = company;
-      opt.textContent = company;
-      companySelect.appendChild(opt);
+  
+    [...years].sort().forEach(year => {
+      const option = document.createElement("option");
+      option.value = year;
+      option.textContent = year;
+      yearSelect.appendChild(option);
     });
-
-    [...years].sort().forEach((year) => {
-      const opt = document.createElement("option");
-      opt.value = year;
-      opt.textContent = year;
-      yearSelect.appendChild(opt);
+  
+    [...companies].sort().forEach(company => {
+      const option = document.createElement("option");
+      option.value = company;
+      option.textContent = company;
+      companySelect.appendChild(option);
     });
+  
+    yearSelect.addEventListener("change", () => filterAndPlot(data));
+    companySelect.addEventListener("change", () => filterAndPlot(data));
   }
-
-  function plotCharts(data) {
-    let filtered = data;
-
-    function updateCharts() {
-      const selectedCompany = companySelect.value;
-      const selectedYear = yearSelect.value;
-
-      filtered = data.filter((launch) => {
-        const matchCompany =
-          selectedCompany === "All" || launch.agency === selectedCompany;
-        const matchYear =
-          selectedYear === "All" || launch.launch_year == selectedYear;
-        return matchCompany && matchYear;
-      });
-
-      renderBarChart(filtered);
-      renderPieChart(filtered);
-      renderBubbleChart(filtered);
-    }
-
-    companySelect.addEventListener("change", updateCharts);
-    yearSelect.addEventListener("change", updateCharts);
-
-    updateCharts(); // initial render
-  }
-
-  function renderBarChart(data) {
-    const yearCounts = {};
-    data.forEach((d) => {
-      if (d.launch_year) {
-        yearCounts[d.launch_year] = (yearCounts[d.launch_year] || 0) + 1;
-      }
+  
+  function filterAndPlot(data) {
+    const year = document.getElementById("yearSelect").value;
+    const agency = document.getElementById("companySelect").value;
+  
+    const filtered = data.filter(d => {
+      const matchYear = year === "All" || d.launch_year == year;
+      const matchAgency = agency === "All" || d.agency === agency;
+      return matchYear && matchAgency;
     });
-
-    const years = Object.keys(yearCounts).sort();
-    const counts = years.map((y) => yearCounts[y]);
-
-    const trace = {
-      x: years,
-      y: counts,
-      type: "bar",
-      marker: { color: "steelblue" },
-    };
-
-    Plotly.newPlot("bar-chart", [trace], {
-      margin: { t: 30 },
-      xaxis: { title: "Launch Year" },
-      yaxis: { title: "# of Launches" },
-    });
+  
+    buildCharts(filtered);
   }
-
-  function renderPieChart(data) {
-    const successCount = data.filter((d) => d.success === true).length;
-    const failCount = data.filter((d) => d.success === false).length;
-
-    const trace = {
+  
+  function buildCharts(data) {
+    const launchesPerYear = {};
+    const agencyBubble = {};
+    let success = 0, failure = 0;
+  
+    data.forEach(d => {
+      const year = d.launch_year;
+      const agency = d.agency;
+  
+      launchesPerYear[year] = (launchesPerYear[year] || 0) + 1;
+      agencyBubble[agency] = (agencyBubble[agency] || 0) + 1;
+      d.success ? success++ : failure++;
+    });
+  
+    Plotly.newPlot("bar-chart", [{
+      x: Object.keys(launchesPerYear),
+      y: Object.values(launchesPerYear),
+      type: "bar"
+    }]);
+  
+    Plotly.newPlot("pie-chart", [{
+      values: [success, failure],
       labels: ["Success", "Failure"],
-      values: [successCount, failCount],
-      type: "pie",
-      marker: {
-        colors: ["green", "red"],
-      },
-    };
-
-    Plotly.newPlot("pie-chart", [trace], {
-      margin: { t: 30 },
-    });
-  }
-
-  function renderBubbleChart(data) {
-    const agencyCounts = {};
-
-    data.forEach((d) => {
-      if (d.agency) {
-        agencyCounts[d.agency] = (agencyCounts[d.agency] || 0) + 1;
-      }
-    });
-
-    const agencies = Object.keys(agencyCounts);
-    const counts = agencies.map((agency) => agencyCounts[agency]);
-
-    const trace = {
-      x: agencies,
-      y: counts,
-      text: agencies,
+      type: "pie"
+    }]);
+  
+    Plotly.newPlot("bubble-chart", [{
+      x: Object.keys(agencyBubble),
+      y: Object.values(agencyBubble),
       mode: "markers",
       marker: {
-        size: counts.map((count) => count * 3),
-        sizemode: "area",
+        size: Object.values(agencyBubble).map(v => v * 10)
       },
-    };
-
-    Plotly.newPlot("bubble-chart", [trace], {
-      margin: { t: 30 },
-      xaxis: { title: "Agency" },
-      yaxis: { title: "Launches" },
-    });
+      text: Object.keys(agencyBubble)
+    }]);
   }
-});
+  
