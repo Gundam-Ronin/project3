@@ -1,78 +1,121 @@
-function renderBarChart(data) {
-  console.log("📊 Bar chart data =", data);
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/api/launches")
+    .then(response => response.json())
+    .then(data => renderAll(data))
+    .catch(error => console.error("Data load error:", error));
+});
 
-  const svg = d3.select("#bar-chart");
-  svg.selectAll("*").remove();
+function renderAll(data) {
+  const cleanData = data.filter(d =>
+    d.launch_year !== null &&
+    d.company !== null &&
+    d.mission_status !== null
+  );
 
-  const width = +svg.attr("width");
-  const height = +svg.attr("height");
-  const margin = { top: 40, right: 30, bottom: 40, left: 60 };
+  renderPlotlyBarChart(cleanData);
+  renderPlotlyBubbleChart(cleanData);
+  renderPlotlySankey(cleanData);
+}
 
-  // Transform mission_status → success boolean
-  data.forEach(d => {
-    d.success = d.mission_status && d.mission_status.toLowerCase().includes("success");
-  });
-
-  // Group by year and outcome
-  const launchesByYear = d3.rollup(
+function renderPlotlyBarChart(data) {
+  const grouped = d3.rollup(
     data,
     v => ({
-      success: v.filter(d => d.success).length,
-      failure: v.filter(d => !d.success).length
+      success: v.filter(d => d.mission_status.toLowerCase().includes("success")).length,
+      failure: v.filter(d => !d.mission_status.toLowerCase().includes("success")).length
     }),
     d => +d.launch_year
   );
 
-  const years = Array.from(launchesByYear.keys()).sort((a, b) => a - b);
-  const successCounts = years.map(y => launchesByYear.get(y).success);
-  const failureCounts = years.map(y => launchesByYear.get(y).failure);
+  const years = Array.from(grouped.keys()).sort();
+  const success = years.map(y => grouped.get(y).success);
+  const failure = years.map(y => grouped.get(y).failure);
 
-  const x = d3.scaleBand()
-    .domain(years)
-    .range([margin.left, width - margin.right])
-    .padding(0.2);
+  const trace1 = { x: years, y: success, name: 'Success', type: 'bar', marker: { color: '#4CAF50' } };
+  const trace2 = { x: years, y: failure, name: 'Failure', type: 'bar', marker: { color: '#F44336' } };
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(successCounts.map((s, i) => s + failureCounts[i]))])
-    .nice()
-    .range([height - margin.bottom, margin.top]);
+  Plotly.newPlot("bar-chart", [trace1, trace2], {
+    barmode: 'group',
+    title: 'Launches by Year',
+    xaxis: { title: 'Year' },
+    yaxis: { title: 'Number of Launches' }
+  });
+}
 
-  // Draw Success bars
-  svg.selectAll(".bar-success")
-    .data(years)
-    .enter()
-    .append("rect")
-    .attr("x", d => x(d))
-    .attr("y", d => y(launchesByYear.get(d).success))
-    .attr("height", d => y(0) - y(launchesByYear.get(d).success))
-    .attr("width", x.bandwidth() / 2)
-    .attr("fill", "#4CAF50");
+function renderPlotlyBubbleChart(data) {
+  const grouped = d3.rollup(
+    data,
+    v => ({
+      count: v.length,
+      successRate: v.filter(d => d.mission_status.toLowerCase().includes("success")).length / v.length
+    }),
+    d => d.company,
+    d => +d.launch_year
+  );
 
-  // Draw Failure bars
-  svg.selectAll(".bar-failure")
-    .data(years)
-    .enter()
-    .append("rect")
-    .attr("x", d => x(d) + x.bandwidth() / 2)
-    .attr("y", d => y(launchesByYear.get(d).failure))
-    .attr("height", d => y(0) - y(launchesByYear.get(d).failure))
-    .attr("width", x.bandwidth() / 2)
-    .attr("fill", "#F44336");
+  const bubbles = [];
+  Array.from(grouped.entries()).forEach(([company, years]) => {
+    Array.from(years.entries()).forEach(([year, stat]) => {
+      bubbles.push({
+        x: year,
+        y: company,
+        text: `${company} (${year}) Success Rate: ${(stat.successRate * 100).toFixed(1)}%`,
+        marker: {
+          size: stat.count * 4,
+          color: stat.successRate,
+          colorscale: "Viridis",
+          showscale: true
+        }
+      });
+    });
+  });
 
-  // X Axis
-  svg.append("g")
-    .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+  Plotly.newPlot("bubble-chart", [{
+    type: "scatter",
+    mode: "markers",
+    x: bubbles.map(b => b.x),
+    y: bubbles.map(b => b.y),
+    text: bubbles.map(b => b.text),
+    marker: bubbles.map(b => b.marker)
+  }], {
+    title: "Launches by Company and Year",
+    xaxis: { title: "Year" },
+    yaxis: { title: "Company" }
+  });
+}
 
-  // Y Axis
-  svg.append("g")
-    .attr("transform", `translate(${margin.left},0)`)
-    .call(d3.axisLeft(y));
+function renderPlotlySankey(data) {
+  const companies = Array.from(new Set(data.map(d => d.company)));
+  const statuses = Array.from(new Set(data.map(d => d.mission_status)));
+  const labels = [...companies, ...statuses];
+  const index = label => labels.indexOf(label);
 
-  // Legend
-  const legend = svg.append("g").attr("transform", `translate(${width - 150}, ${margin.top})`);
-  legend.append("rect").attr("width", 15).attr("height", 15).attr("fill", "#4CAF50");
-  legend.append("text").text("Success").attr("x", 20).attr("y", 12);
-  legend.append("rect").attr("width", 15).attr("height", 15).attr("y", 20).attr("fill", "#F44336");
-  legend.append("text").text("Failure").attr("x", 20).attr("y", 32);
+  const linkMap = new Map();
+  data.forEach(d => {
+    const key = `${d.company}→${d.mission_status}`;
+    linkMap.set(key, (linkMap.get(key) || 0) + 1);
+  });
+
+  const links = Array.from(linkMap.entries()).map(([k, v]) => {
+    const [source, target] = k.split("→");
+    return { source: index(source), target: index(target), value: v };
+  });
+
+  Plotly.newPlot("sankey-chart", [{
+    type: "sankey",
+    orientation: "h",
+    node: {
+      pad: 15,
+      thickness: 20,
+      line: { color: "black", width: 0.5 },
+      label: labels
+    },
+    link: {
+      source: links.map(l => l.source),
+      target: links.map(l => l.target),
+      value: links.map(l => l.value)
+    }
+  }], {
+    title: "Company to Mission Outcome Flow"
+  });
 }
