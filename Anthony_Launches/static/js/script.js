@@ -1,82 +1,134 @@
-document.addEventListener('DOMContentLoaded', function () {
-  // Fetch and display launch data
-  fetch('/api/launches')
-    .then(response => response.json())
-    .then(data => {
-      populateDropdown(data);
-      renderCharts(data); // Initial render
+document.addEventListener("DOMContentLoaded", function () {
+  const companySelect = document.getElementById("companySelect");
+  const yearSelect = document.getElementById("yearSelect");
+
+  fetch("/api/launches")
+    .then((res) => res.json())
+    .then((data) => {
+      populateFilters(data);
+      plotCharts(data);
     });
 
-  // Populate year dropdown
-  function populateDropdown(data) {
-    const yearDropdown = document.getElementById('yearDropdown');
-    if (!yearDropdown) return;
+  function populateFilters(data) {
+    const companies = new Set();
+    const years = new Set();
 
-    const years = [...new Set(data.map(d => d.launch_year))].sort();
-    yearDropdown.innerHTML = '<option value="All">All Years</option>';
-    years.forEach(year => {
-      const option = document.createElement('option');
-      option.value = year;
-      option.textContent = year;
-      yearDropdown.appendChild(option);
+    data.forEach((launch) => {
+      if (launch.agency) companies.add(launch.agency);
+      if (launch.launch_year) years.add(launch.launch_year);
     });
 
-    yearDropdown.addEventListener('change', function () {
-      const selectedYear = this.value;
-      const filteredData = selectedYear === 'All' 
-        ? data 
-        : data.filter(d => d.launch_year == selectedYear);
-      renderCharts(filteredData);
+    [...companies].sort().forEach((company) => {
+      const opt = document.createElement("option");
+      opt.value = company;
+      opt.textContent = company;
+      companySelect.appendChild(opt);
+    });
+
+    [...years].sort().forEach((year) => {
+      const opt = document.createElement("option");
+      opt.value = year;
+      opt.textContent = year;
+      yearSelect.appendChild(opt);
     });
   }
 
-  // Render all charts
-  function renderCharts(data) {
-    renderBarChart(data);
-    renderBubbleChart(data);
-    renderSuccessPie(data);
+  function plotCharts(data) {
+    let filtered = data;
+
+    function updateCharts() {
+      const selectedCompany = companySelect.value;
+      const selectedYear = yearSelect.value;
+
+      filtered = data.filter((launch) => {
+        const matchCompany =
+          selectedCompany === "All" || launch.agency === selectedCompany;
+        const matchYear =
+          selectedYear === "All" || launch.launch_year == selectedYear;
+        return matchCompany && matchYear;
+      });
+
+      renderBarChart(filtered);
+      renderPieChart(filtered);
+      renderBubbleChart(filtered);
+    }
+
+    companySelect.addEventListener("change", updateCharts);
+    yearSelect.addEventListener("change", updateCharts);
+
+    updateCharts(); // initial render
   }
 
   function renderBarChart(data) {
     const yearCounts = {};
-    data.forEach(d => {
-      yearCounts[d.launch_year] = (yearCounts[d.launch_year] || 0) + 1;
+    data.forEach((d) => {
+      if (d.launch_year) {
+        yearCounts[d.launch_year] = (yearCounts[d.launch_year] || 0) + 1;
+      }
     });
 
+    const years = Object.keys(yearCounts).sort();
+    const counts = years.map((y) => yearCounts[y]);
+
     const trace = {
-      x: Object.keys(yearCounts),
-      y: Object.values(yearCounts),
-      type: 'bar'
+      x: years,
+      y: counts,
+      type: "bar",
+      marker: { color: "steelblue" },
     };
 
-    Plotly.newPlot('bar', [trace]);
+    Plotly.newPlot("bar-chart", [trace], {
+      margin: { t: 30 },
+      xaxis: { title: "Launch Year" },
+      yaxis: { title: "# of Launches" },
+    });
+  }
+
+  function renderPieChart(data) {
+    const successCount = data.filter((d) => d.success === true).length;
+    const failCount = data.filter((d) => d.success === false).length;
+
+    const trace = {
+      labels: ["Success", "Failure"],
+      values: [successCount, failCount],
+      type: "pie",
+      marker: {
+        colors: ["green", "red"],
+      },
+    };
+
+    Plotly.newPlot("pie-chart", [trace], {
+      margin: { t: 30 },
+    });
   }
 
   function renderBubbleChart(data) {
-    const trace = {
-      x: data.map(d => d.launch_year),
-      y: data.map(d => d.success ? 1 : 0),
-      text: data.map(d => d.mission_name),
-      mode: 'markers',
-      marker: {
-        size: data.map(d => d.success ? 20 : 10),
-        color: data.map(d => d.success ? 'green' : 'red'),
+    const agencyCounts = {};
+
+    data.forEach((d) => {
+      if (d.agency) {
+        agencyCounts[d.agency] = (agencyCounts[d.agency] || 0) + 1;
       }
-    };
+    });
 
-    Plotly.newPlot('bubble', [trace]);
-  }
-
-  function renderSuccessPie(data) {
-    const successCount = data.filter(d => d.success).length;
-    const failureCount = data.length - successCount;
+    const agencies = Object.keys(agencyCounts);
+    const counts = agencies.map((agency) => agencyCounts[agency]);
 
     const trace = {
-      labels: ['Success', 'Failure'],
-      values: [successCount, failureCount],
-      type: 'pie'
+      x: agencies,
+      y: counts,
+      text: agencies,
+      mode: "markers",
+      marker: {
+        size: counts.map((count) => count * 3),
+        sizemode: "area",
+      },
     };
 
-    Plotly.newPlot('pie', [trace]);
+    Plotly.newPlot("bubble-chart", [trace], {
+      margin: { t: 30 },
+      xaxis: { title: "Agency" },
+      yaxis: { title: "Launches" },
+    });
   }
 });
