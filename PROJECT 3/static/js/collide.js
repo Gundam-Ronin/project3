@@ -1,4 +1,5 @@
 function renderCollideChart(data) {
+  console.log("data=", data );
   const svg = d3.select("#bubble-chart");
   svg.selectAll("*").remove();
 
@@ -42,4 +43,4 @@ function renderCollideChart(data) {
   }
 }
 
-console.log("data=", data )
+
