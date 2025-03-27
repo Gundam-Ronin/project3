@@ -8,7 +8,7 @@ load_dotenv()
 
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
-    csv_path = Path("static/launch_data.csv")
+    csv_path = Path("launch_data.csv")
     if not csv_path.exists():
         print(f"❌ CSV not found at {csv_path}")
         return
