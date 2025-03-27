@@ -23,7 +23,11 @@ def init_db_pool():
     global db_pool
     if db_pool is None:
         print("🔄 Initializing DB connection pool...")
-        db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+        db_pool = pool.SimpleConnectionPool(
+            1, 10,
+            dsn=DATABASE_URL,
+            sslmode='require'  # <-- force SSL at connect level
+        )
 
 def get_db_connection():
     if db_pool is None:
