@@ -77,3 +77,5 @@ function renderBarChart(data) {
     .attr("transform", `translate(${margin.left},0)`)
     .call(d3.axisLeft(y));
 }
+
+console.log("data=", data )
