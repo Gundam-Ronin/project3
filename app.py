@@ -13,27 +13,20 @@ load_dotenv()
 app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folder="Anthony_Launches/static")
 CORS(app)
 
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# ✅ Don't initialize the pool yet — wait until the app is ready
+db_pool = None
 
-import ssl
-import psycopg2.extras
-
-db_pool = pool.SimpleConnectionPool(
-    1, 10,
-    dsn=DATABASE_URL,
-    sslmode='require',
-    sslrootcert=None,
-    sslcert=None,
-    sslkey=None
-)
-
-
+# ✅ Lazy-init the connection pool only when needed
 def init_db_pool():
     global db_pool
     if db_pool is None:
-        db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+        db_pool = pool.SimpleConnectionPool(
+            1, 10,
+            dsn=DATABASE_URL,
+            sslmode='require'
+        )
 
 def get_db_connection():
     if db_pool is None:
@@ -101,13 +94,14 @@ def api_get_launches():
         data = [dict(zip(columns, row)) for row in cur.fetchall()]
     return jsonify(data)
 
+# ✅ Manual data-loading endpoint (visit after deploy!)
 @app.route("/load-data")
 def load_data_manually():
     create_launches_table()
     load_csv_to_postgres()
     return "✅ Launch data loaded successfully!"
 
-
+# Local dev init
 def initialize_app():
     create_launches_table()
     load_csv_to_postgres()
@@ -116,4 +110,3 @@ if __name__ == "__main__":
     if os.getenv("FLASK_ENV") == "development":
         initialize_app()
     app.run(debug=True)
-
