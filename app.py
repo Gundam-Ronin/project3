@@ -15,10 +15,9 @@ CORS(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ✅ Don't initialize the pool yet — wait until the app is ready
+# ✅ Initialize later (lazy)
 db_pool = None
 
-# ✅ Lazy-init the connection pool only when needed
 def init_db_pool():
     global db_pool
     if db_pool is None:
@@ -94,14 +93,12 @@ def api_get_launches():
         data = [dict(zip(columns, row)) for row in cur.fetchall()]
     return jsonify(data)
 
-# ✅ Manual data-loading endpoint (visit after deploy!)
 @app.route("/load-data")
 def load_data_manually():
     create_launches_table()
     load_csv_to_postgres()
     return "✅ Launch data loaded successfully!"
 
-# Local dev init
 def initialize_app():
     create_launches_table()
     load_csv_to_postgres()
