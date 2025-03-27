@@ -14,16 +14,20 @@ app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folde
 CORS(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-FLASK_ENV = os.getenv("FLASK_ENV", "production")
+db_pool = None  # ✅ Lazy init
 
-# ✅ Global db_pool starts as None
-db_pool = None
-
+# ✅ Initialize DB pool only when needed
 def init_db_pool():
     global db_pool
     if db_pool is None:
-        print(f"🔌 Initializing DB connection to: {DATABASE_URL}")
-        db_pool = pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+        print("🔄 Initializing DB connection pool...")
+        db_pool = pool.SimpleConnectionPool(
+            1, 10,
+            dsn=DATABASE_URL,
+            sslmode="require"  # ✅ Critical for Render-hosted PostgreSQL
+        )
+    else:
+        print("✅ DB pool already initialized.")
 
 def get_db_connection():
     if db_pool is None:
@@ -52,11 +56,12 @@ def create_launches_table():
         cur.execute(create_query)
 
 def load_csv_to_postgres():
-    print("📥 Attempting to load CSV into PostgreSQL...")
-    csv_path = Path("Anthony_Launches/launch_data.csv")
+    print("📥 Loading CSV into PostgreSQL...")
+    csv_path = Path("launch_data.csv")
+    print(f"🔎 Checking path: {csv_path.resolve()}")
 
     if not csv_path.exists():
-        print(f"❌ CSV not found at {csv_path.resolve()}")
+        print(f"❌ CSV not found at {csv_path}")
         return
 
     df = pd.read_csv(csv_path)
@@ -78,34 +83,52 @@ def load_csv_to_postgres():
                 row["mission_status"]
             ))
 
-    print("✅ Data loaded successfully into 'launches' table.")
+    print("✅ Data loaded successfully.")
+
+# ✅ Health check route
+@app.route("/ping-db")
+def ping_db():
+    try:
+        conn = get_db_connection()
+        conn.close()
+        return "✅ DB connection successful!"
+    except Exception as e:
+        print(f"❌ /ping-db failed: {str(e)}")
+        return f"❌ DB connection failed: {str(e)}", 500
 
 @app.route("/")
 def dashboard():
     return render_template("index.html")
 
+# ✅ Wrapped with error log
 @app.route("/api/launches")
 def api_get_launches():
-    with get_conn_cursor() as (_, cur):
-        cur.execute("SELECT company, launch_year, mission_status FROM launches;")
-        columns = [desc[0] for desc in cur.description]
-        data = [dict(zip(columns, row)) for row in cur.fetchall()]
-    return jsonify(data)
+    try:
+        with get_conn_cursor() as (_, cur):
+            cur.execute("SELECT company, launch_year, mission_status FROM launches;")
+            columns = [desc[0] for desc in cur.description]
+            data = [dict(zip(columns, row)) for row in cur.fetchall()]
+        return jsonify(data)
+    except Exception as e:
+        print(f"❌ /api/launches failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
+# ✅ Force reload CSV to DB
 @app.route("/load-data")
 def load_data_manually():
-    if FLASK_ENV != "development":
-        return "❌ Not allowed in production", 403
-    create_launches_table()
-    load_csv_to_postgres()
-    return "✅ Launch data loaded successfully!"
+    try:
+        create_launches_table()
+        load_csv_to_postgres()
+        return "✅ Launch data loaded successfully!"
+    except Exception as e:
+        print(f"❌ /load-data failed: {str(e)}")
+        return f"❌ Error loading data: {str(e)}", 500
 
 def initialize_app():
-    print("🛠 Initializing app...")
     create_launches_table()
     load_csv_to_postgres()
 
 if __name__ == "__main__":
-    if FLASK_ENV == "development":
+    if os.getenv("FLASK_ENV") == "development":
         initialize_app()
     app.run(debug=True)
