@@ -101,8 +101,4 @@ def initialize_app():
     create_launches_table()
     load_csv_to_postgres()
 
-# Only run this locally — NOT in production!
-if __name__ == "__main__":
-    if os.getenv("FLASK_ENV") == "development":
-        initialize_app()
-    app.run(debug=True)
+
