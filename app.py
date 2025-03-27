@@ -17,8 +17,17 @@ CORS(app)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-# Initialize DB pool
-db_pool = None
+import ssl
+import psycopg2.extras
+
+db_pool = pool.SimpleConnectionPool(
+    1, 10,
+    dsn=DATABASE_URL,
+    sslmode='require',
+    sslrootcert=None,
+    sslcert=None,
+    sslkey=None
+)
 
 def init_db_pool():
     global db_pool
