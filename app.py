@@ -13,15 +13,9 @@ load_dotenv()
 app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folder="Anthony_Launches/static")
 CORS(app)
 
-# ✅ DEFINE DATABASE_URL first!
+#DEFINE DATABASE_URL 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ✅ Append sslmode=require if not already in the URL
-if DATABASE_URL and "sslmode" not in DATABASE_URL:
-    if "?" in DATABASE_URL:
-        DATABASE_URL += "&sslmode=require"
-    else:
-        DATABASE_URL += "?sslmode=require"
 
 # Initialize DB pool
 db_pool = None
