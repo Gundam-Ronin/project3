@@ -24,7 +24,6 @@ def init_db_pool():
         db_pool = pool.SimpleConnectionPool(
             1, 10,
             dsn=DATABASE_URL,
-            sslmode='require'
         )
 
 def get_db_connection():
