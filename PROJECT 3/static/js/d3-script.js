@@ -1,5 +1,5 @@
 function renderBarChart(data) {
-  console.log("data =", data);  // 🐞 Debug: confirm data loaded for bar chart
+  console.log("📊 DATA FROM /api/launches:", data);  // ← debug print
 
   const svg = d3.select("#bar-chart");
   svg.selectAll("*").remove();
