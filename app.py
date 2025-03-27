@@ -7,16 +7,21 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 from contextlib import contextmanager
+import ssl
 
 load_dotenv()
 
-app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folder="Anthony_Launches/static")
+app = Flask(
+    __name__,
+    template_folder="Anthony_Launches/templates",
+    static_folder="Anthony_Launches/static"
+)
 CORS(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-db_pool = None  # ✅ Lazy init
+db_pool = None  # Lazy init
 
-# ✅ Initialize DB pool only when needed
+# ✅ FIXED: Safe SSL-compatible DB pool for Render
 def init_db_pool():
     global db_pool
     if db_pool is None:
@@ -24,12 +29,11 @@ def init_db_pool():
         db_pool = pool.SimpleConnectionPool(
             1, 10,
             dsn=DATABASE_URL,
-            sslmode="require",   # ✅ Needed
-            options="-c sslmode=require"  # ✅ This helps Render accept it reliably
+            sslmode='require',         # Required by Render
+            sslrootcert=None,
+            sslcert=None,
+            sslkey=None
         )
-
-    else:
-        print("✅ DB pool already initialized.")
 
 def get_db_connection():
     if db_pool is None:
@@ -60,8 +64,6 @@ def create_launches_table():
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
     csv_path = Path("launch_data.csv")
-    print(f"🔎 Checking path: {csv_path.resolve()}")
-
     if not csv_path.exists():
         print(f"❌ CSV not found at {csv_path}")
         return
@@ -87,44 +89,33 @@ def load_csv_to_postgres():
 
     print("✅ Data loaded successfully.")
 
-# ✅ Health check route
-@app.route("/ping-db")
-def ping_db():
-    try:
-        conn = get_db_connection()
-        conn.close()
-        return "✅ DB connection successful!"
-    except Exception as e:
-        print(f"❌ /ping-db failed: {str(e)}")
-        return f"❌ DB connection failed: {str(e)}", 500
-
 @app.route("/")
 def dashboard():
     return render_template("index.html")
 
-# ✅ Wrapped with error log
 @app.route("/api/launches")
 def api_get_launches():
-    try:
-        with get_conn_cursor() as (_, cur):
-            cur.execute("SELECT company, launch_year, mission_status FROM launches;")
-            columns = [desc[0] for desc in cur.description]
-            data = [dict(zip(columns, row)) for row in cur.fetchall()]
-        return jsonify(data)
-    except Exception as e:
-        print(f"❌ /api/launches failed: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    with get_conn_cursor() as (_, cur):
+        cur.execute("SELECT company, launch_year, mission_status FROM launches;")
+        columns = [desc[0] for desc in cur.description]
+        data = [dict(zip(columns, row)) for row in cur.fetchall()]
+    return jsonify(data)
 
-# ✅ Force reload CSV to DB
 @app.route("/load-data")
 def load_data_manually():
+    create_launches_table()
+    load_csv_to_postgres()
+    return "✅ Launch data loaded successfully!"
+
+# Optional ping route for Render debugging
+@app.route("/ping-db")
+def ping_db():
     try:
-        create_launches_table()
-        load_csv_to_postgres()
-        return "✅ Launch data loaded successfully!"
+        with get_conn_cursor() as (_, cur):
+            cur.execute("SELECT 1;")
+        return "✅ DB connection successful!"
     except Exception as e:
-        print(f"❌ /load-data failed: {str(e)}")
-        return f"❌ Error loading data: {str(e)}", 500
+        return f"❌ DB connection failed: {e}"
 
 def initialize_app():
     create_launches_table()
