@@ -24,8 +24,10 @@ def init_db_pool():
         db_pool = pool.SimpleConnectionPool(
             1, 10,
             dsn=DATABASE_URL,
-            sslmode="require"  # ✅ Critical for Render-hosted PostgreSQL
+            sslmode="require",   # ✅ Needed
+            options="-c sslmode=require"  # ✅ This helps Render accept it reliably
         )
+
     else:
         print("✅ DB pool already initialized.")
 
