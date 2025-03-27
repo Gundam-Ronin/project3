@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="Anthony_Launches/templates", static_folder="Anthony_Launches/static")
 CORS(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
