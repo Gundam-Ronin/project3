@@ -41,3 +41,5 @@ function renderCollideChart(data) {
       .attr("cy", d => d.y);
   }
 }
+
+console.log("data=", data )
