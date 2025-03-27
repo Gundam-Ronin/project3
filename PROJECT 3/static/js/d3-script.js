@@ -8,8 +8,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function renderAll(data) {
-  renderCollideChart(data);  // Bubble chart (from collide.js)
-  renderBarChart(data);      // Now defined below
+  const cleanData = data.filter(d =>
+    d.launch_year !== null &&
+    d.mission_name !== null &&
+    d.success !== null
+  );
+
+  renderCollideChart(cleanData);  // Bubble chart (from collide.js)
+  renderBarChart(cleanData);      // Bar chart (below)
 }
 
 // 📊 Bar Chart: Launches per Year
@@ -21,14 +27,14 @@ function renderBarChart(data) {
   const height = +svg.attr("height");
   const margin = { top: 20, right: 30, bottom: 40, left: 50 };
 
-  // Count launches per year
+  // Count launches per year (cast year to number)
   const launchesByYear = d3.rollup(
     data,
     v => v.length,
-    d => d.launch_year
+    d => +d.launch_year
   );
 
-  const years = Array.from(launchesByYear.keys()).sort();
+  const years = Array.from(launchesByYear.keys()).sort((a, b) => a - b);
   const counts = years.map(year => launchesByYear.get(year));
 
   const x = d3.scaleBand()
@@ -50,7 +56,16 @@ function renderBarChart(data) {
     .attr("y", d => y(launchesByYear.get(d)))
     .attr("height", d => y(0) - y(launchesByYear.get(d)))
     .attr("width", x.bandwidth())
-    .attr("fill", "#4CAF50");
+    .attr("fill", "#4CAF50")
+    // 🔽 Tooltip and hover effect (optional)
+    .on("mouseover", function (event, d) {
+      d3.select(this).attr("fill", "#2196F3");
+    })
+    .on("mouseout", function (event, d) {
+      d3.select(this).attr("fill", "#4CAF50");
+    })
+    .append("title")
+    .text(d => `Year: ${d}\nLaunches: ${launchesByYear.get(d)}`);
 
   // X Axis
   svg.append("g")
