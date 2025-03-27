@@ -1,99 +1,82 @@
-let allLaunchData = [];
+document.addEventListener('DOMContentLoaded', function () {
+  // Fetch and display launch data
+  fetch('/api/launches')
+    .then(response => response.json())
+    .then(data => {
+      populateDropdown(data);
+      renderCharts(data); // Initial render
+    });
 
-async function fetchLaunchData() {
-  const response = await fetch('/api/launches');
-  const data = await response.json();
-  allLaunchData = data;
-  populateFilters(data);
-  updateCharts(data);
-}
+  // Populate year dropdown
+  function populateDropdown(data) {
+    const yearDropdown = document.getElementById('yearDropdown');
+    if (!yearDropdown) return;
 
-function populateFilters(data) {
-  const years = [...new Set(data.map(d => d.launch_year))].sort();
-  const agencies = [...new Set(data.map(d => d.agency))].sort();
+    const years = [...new Set(data.map(d => d.launch_year))].sort();
+    yearDropdown.innerHTML = '<option value="All">All Years</option>';
+    years.forEach(year => {
+      const option = document.createElement('option');
+      option.value = year;
+      option.textContent = year;
+      yearDropdown.appendChild(option);
+    });
 
-  years.forEach(year => {
-    document.getElementById('yearDropdown').innerHTML += `<option value="${year}">${year}</option>`;
-  });
+    yearDropdown.addEventListener('change', function () {
+      const selectedYear = this.value;
+      const filteredData = selectedYear === 'All' 
+        ? data 
+        : data.filter(d => d.launch_year == selectedYear);
+      renderCharts(filteredData);
+    });
+  }
 
-  agencies.forEach(agency => {
-    document.getElementById('agencyDropdown').innerHTML += `<option value="${agency}">${agency}</option>`;
-  });
-}
+  // Render all charts
+  function renderCharts(data) {
+    renderBarChart(data);
+    renderBubbleChart(data);
+    renderSuccessPie(data);
+  }
 
-function filterData() {
-  const selectedYear = document.getElementById('yearDropdown').value;
-  const selectedAgency = document.getElementById('agencyDropdown').value;
+  function renderBarChart(data) {
+    const yearCounts = {};
+    data.forEach(d => {
+      yearCounts[d.launch_year] = (yearCounts[d.launch_year] || 0) + 1;
+    });
 
-  return allLaunchData.filter(d =>
-    (selectedYear === 'all' || d.launch_year == selectedYear) &&
-    (selectedAgency === 'all' || d.agency === selectedAgency)
-  );
-}
+    const trace = {
+      x: Object.keys(yearCounts),
+      y: Object.values(yearCounts),
+      type: 'bar'
+    };
 
-function updateCharts() {
-  const filtered = filterData();
+    Plotly.newPlot('bar', [trace]);
+  }
 
-  // 1. Bar Chart – Launches per Year
-  const yearCounts = {};
-  filtered.forEach(d => {
-    yearCounts[d.launch_year] = (yearCounts[d.launch_year] || 0) + 1;
-  });
+  function renderBubbleChart(data) {
+    const trace = {
+      x: data.map(d => d.launch_year),
+      y: data.map(d => d.success ? 1 : 0),
+      text: data.map(d => d.mission_name),
+      mode: 'markers',
+      marker: {
+        size: data.map(d => d.success ? 20 : 10),
+        color: data.map(d => d.success ? 'green' : 'red'),
+      }
+    };
 
-  const barData = [{
-    x: Object.keys(yearCounts),
-    y: Object.values(yearCounts),
-    type: 'bar',
-    marker: { color: 'rgb(26, 118, 255)' }
-  }];
+    Plotly.newPlot('bubble', [trace]);
+  }
 
-  Plotly.newPlot('barChart', barData, {
-    title: 'Launches per Year',
-    xaxis: { title: 'Year' },
-    yaxis: { title: 'Number of Launches' }
-  });
+  function renderSuccessPie(data) {
+    const successCount = data.filter(d => d.success).length;
+    const failureCount = data.length - successCount;
 
-  // 2. Bubble Chart – Payload vs Year
-  const bubbleData = [{
-    x: filtered.map(d => d.launch_year),
-    y: filtered.map(d => d.payload_mass_kg || 0),
-    text: filtered.map(d => d.mission_name),
-    mode: 'markers',
-    marker: {
-      size: filtered.map(d => d.payload_mass_kg || 0),
-      sizemode: 'area',
-      sizeref: 2.0 * Math.max(...filtered.map(d => d.payload_mass_kg || 1)) / (100**2),
-      color: filtered.map(d => d.agency),
-      showscale: true
-    }
-  }];
+    const trace = {
+      labels: ['Success', 'Failure'],
+      values: [successCount, failureCount],
+      type: 'pie'
+    };
 
-  Plotly.newPlot('bubbleChart', bubbleData, {
-    title: 'Payload Mass vs Launch Year',
-    xaxis: { title: 'Launch Year' },
-    yaxis: { title: 'Payload Mass (kg)' }
-  });
-
-  // 3. Pie Chart – Launch Success Rate
-  const successCount = filtered.filter(d => d.success === true).length;
-  const failureCount = filtered.filter(d => d.success === false).length;
-
-  const pieData = [{
-    labels: ['Success', 'Failure'],
-    values: [successCount, failureCount],
-    type: 'pie',
-    textinfo: 'label+percent',
-    hole: 0.4
-  }];
-
-  Plotly.newPlot('pieChart', pieData, {
-    title: 'Launch Outcome Breakdown'
-  });
-}
-
-// Event listeners
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('yearDropdown').addEventListener('change', updateCharts);
-  document.getElementById('agencyDropdown').addEventListener('change', updateCharts);
-  fetchLaunchData();
+    Plotly.newPlot('pie', [trace]);
+  }
 });
