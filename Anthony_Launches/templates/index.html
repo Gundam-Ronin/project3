@@ -1,15 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Launch Dashboard</title>
+  <meta charset="UTF-8">
+  <title>Space Launch Dashboard</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .filter-container {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .chart-container {
+      margin: 30px auto;
+      max-width: 1000px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Space Launch Data</h1>
-  <div id="bar"></div>
-  <div id="bubble"></div>
-  <div id="line"></div>
-  <script src="/static/js/script.js"></script>
+  <h1>🚀 Space Launch Dashboard</h1>
+
+  <div class="filter-container">
+    <label for="yearDropdown">Filter by Launch Year:</label>
+    <select id="yearDropdown">
+      <option value="all">All Years</option>
+    </select>
+
+    <label for="agencyDropdown" style="margin-left: 20px;">Filter by Agency:</label>
+    <select id="agencyDropdown">
+      <option value="all">All Agencies</option>
+    </select>
+  </div>
+
+  <div class="chart-container">
+    <div id="barChart"></div>
+  </div>
+
+  <div class="chart-container">
+    <div id="bubbleChart"></div>
+  </div>
+
+  <div class="chart-container">
+    <div id="pieChart"></div>
+  </div>
+
+  <script>
+    let allLaunchData = [];
+
+    async function fetchLaunchData() {
+      const response = await fetch('/api/launches');
+      const data = await response.json();
+      allLaunchData = data;
+      populateFilters(data);
+      updateCharts(data);
+    }
+
+    function populateFilters(data) {
+      const years = [...new Set(data.map(d => d.launch_year))].sort();
+      const agencies = [...new Set(data.map(d => d.agency))].sort();
+
+      years.forEach(year => {
+        $('#yearDropdown').append(`<option value="${year}">${year}</option>`);
+      });
+
+      agencies.forEach(agency => {
+        $('#agencyDropdown').append(`<option value="${agency}">${agency}</option>`);
+      });
+    }
+
+    function filterData() {
+      const selectedYear = $('#yearDropdown').val();
+      const selectedAgency = $('#agencyDropdown').val();
+
+      return allLaunchData.filter(d =>
+        (selectedYear === 'all' || d.launch_year == selectedYear) &&
+        (selectedAgency === 'all' || d.agency === selectedAgency)
+      );
+    }
+
+    function updateCharts(data) {
+      const filtered = filterData();
+
+      // Bar chart: Launches per year
+      const yearCounts = {};
+      filtered.forEach(d => {
+        yearCounts[d.launch_year] = (yearCounts[d.launch_year] || 0) + 1;
+      });
+
+      const barData = [{
+        x: Object.keys(yearCounts),
+        y: Object.values(yearCounts),
+        type: 'bar'
+      }];
+
+      Plotly.newPlot('barChart', barData, { title: 'Launches per Year' });
+
+      // Bubble chart: Payload weight vs Launch Year
+      const bubbleData = [{
+        x: filtered.map(d => d.launch_year),
+        y: filtered.map(d => d.payload_mass_kg || 0),
+        text: filtered.map(d => d.mission_name),
+        mode: 'markers',
+        marker: {
+          size: filtered.map(d => d.payload_mass_kg || 0),
+          sizemode: 'area',
+          sizeref: 2.0 * Math.max(...filtered.map(d => d.payload_mass_kg || 0)) / (100**2),
+          color: filtered.map(d => d.agency),
+        }
+      }];
+
+      Plotly.newPlot('bubbleChart', bubbleData, { title: 'Payload Mass by Launch Year' });
+
+      // Pie chart: Success vs Failure
+      const successCount = filtered.filter(d => d.success === true).length;
+      const failureCount = filtered.filter(d => d.success === false).length;
+
+      const pieData = [{
+        labels: ['Success', 'Failure'],
+        values: [successCount, failureCount],
+        type: 'pie'
+      }];
+
+      Plotly.newPlot('pieChart', pieData, { title: 'Launch Outcomes' });
+    }
+
+    $('#yearDropdown, #agencyDropdown').on('change', () => updateCharts(allLaunchData));
+
+    fetchLaunchData();
+  </script>
 </body>
 </html>
