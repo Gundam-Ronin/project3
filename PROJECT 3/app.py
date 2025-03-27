@@ -55,6 +55,8 @@ def create_launches_table():
     with get_conn_cursor() as (_, cur):
         cur.execute(create_query)
 
+
+
 def load_csv_to_postgres():
     print("📥 Loading CSV into PostgreSQL...")
     csv_path = Path("static/launch_data.csv")
@@ -64,27 +66,68 @@ def load_csv_to_postgres():
 
     df = pd.read_csv(csv_path)
 
+    # 🛠️ Rename columns
+    df.rename(columns={
+        "Mission": "mission_name",
+        "Date": "launch_date",
+        "Company": "agency",
+        "Rocket": "rocket",
+        "RocketStatus": "rocket_status",
+        "Location": "location",
+        "MissionStatus": "mission_status",
+        "Price": "price"
+    }, inplace=True)
+
+    # Derive additional fields
+    df["launch_year"] = pd.to_datetime(df["launch_date"], errors="coerce").dt.year
+    df["success"] = df["mission_status"].str.lower().str.contains("success", na=False)
+    df["failure_reason"] = df["mission_status"].where(~df["success"], None)
+    df["payload_mass_kg"] = 1000  # or use a real column if available
+    df["source_id"] = df["mission_name"].fillna("Unknown") + "_" + df["launch_date"].fillna("")
+
+    # Add missing fields if not in CSV
+    for col in ["company", "date", "time"]:
+        if col not in df.columns:
+            df[col] = None
+
+    # Drop rows missing required data
+    df.dropna(subset=["mission_name", "launch_date", "launch_year", "agency"], inplace=True)
+
     with get_conn_cursor() as (_, cur):
         insert_query = """
         INSERT INTO launches (
             mission_name, launch_date, launch_year, success,
-            failure_reason, agency, payload_mass_kg, source_id
+            failure_reason, agency, payload_mass_kg, source_id,
+            company, location, date, time, rocket, mission, rocket_status, price, mission_status
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source_id) DO NOTHING;
         """
         for _, row in df.iterrows():
             cur.execute(insert_query, (
-                row['mission_name'],
-                row['launch_date'],
-                row['launch_year'],
-                row['success'],
-                row.get('failure_reason'),
-                row['agency'],
-                row.get('payload_mass_kg', 0),
-                row['source_id']
+                row.get("mission_name"),
+                row.get("launch_date"),
+                int(row.get("launch_year")),
+                row.get("success"),
+                row.get("failure_reason"),
+                row.get("agency"),
+                row.get("payload_mass_kg", 0),
+                row.get("source_id"),
+                row.get("agency"),  # reused as company if needed
+                row.get("location"),
+                row.get("launch_date"),
+                row.get("Time"),  # from CSV if capitalized
+                row.get("rocket"),
+                row.get("mission_name"),
+                row.get("rocket_status"),
+                row.get("price"),
+                row.get("mission_status")
             ))
+
     print("✅ Data loaded successfully.")
+
+
+
 
 @app.route("/")
 def dashboard():
