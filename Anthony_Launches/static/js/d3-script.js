@@ -4,6 +4,7 @@ function buildMetadata(company) {
   const launches = launchData.filter(d => d.company === company);
   const total = launches.length;
   const successes = launches.filter(d => d.mission_status.toLowerCase().includes("success")).length;
+  const failures = total - successes;
   const years = launches.map(d => d.launch_year);
   const mostRecent = Math.max(...years);
 
@@ -11,12 +12,12 @@ function buildMetadata(company) {
   panel.html("");
   panel.append("p").text(`Total Launches: ${total}`);
   panel.append("p").text(`Successful Launches: ${successes}`);
+  panel.append("p").text(`Failed Launches: ${failures}`);
   panel.append("p").text(`Most Recent Year: ${mostRecent}`);
 }
 
-function buildCharts(company) {
+function buildBarChart(company) {
   const launches = launchData.filter(d => d.company === company);
-
   const countsByYear = d3.rollup(
     launches,
     v => v.length,
@@ -37,6 +38,10 @@ function buildCharts(company) {
     title: `Launches Per Year (${company})`,
     margin: { t: 40, l: 80 }
   });
+}
+
+function buildBubbleChart(company) {
+  const launches = launchData.filter(d => d.company === company);
 
   const bubbleTrace = {
     x: launches.map(d => d.launch_year),
@@ -57,35 +62,27 @@ function buildCharts(company) {
   });
 }
 
-function init() {
-  d3.json("/api/launches").then(data => {
-    const companies = [...new Set(data.map(d => d.company))];
-    const dropdown = d3.select("#selCompany");
+function buildPieChart(company) {
+  const launches = launchData.filter(d => d.company === company);
+  const success = launches.filter(d => d.mission_status.toLowerCase().includes("success")).length;
+  const fail = launches.length - success;
 
-    companies.forEach(company => {
-      dropdown.append("option").text(company).property("value", company);
-    });
+  const pieTrace = {
+    labels: ["Success", "Failure"],
+    values: [success, fail],
+    type: "pie"
+  };
 
-    const first = companies[0];
-    buildBarChart(data, first);
-    buildBubbleChart(data, first);
-    buildPieChart(data, first);   // ✅ new
-    showMetadata(data, first);
-  });
-}
-
-function optionChanged(company) {
-  d3.json("/api/launches").then(data => {
-    buildBarChart(data, company);
-    buildBubbleChart(data, company);
-    buildPieChart(data, company);   // ✅ new
-    showMetadata(data, company);
+  Plotly.newPlot("pie", [pieTrace], {
+    title: `Mission Outcome for ${company}`
   });
 }
 
 function optionChanged(company) {
   buildMetadata(company);
-  buildCharts(company);
+  buildBarChart(company);
+  buildBubbleChart(company);
+  buildPieChart(company); // ✅ step 5 pie
 }
 
 function init() {
@@ -101,7 +98,9 @@ function init() {
 
     const first = companies[0];
     buildMetadata(first);
-    buildCharts(first);
+    buildBarChart(first);
+    buildBubbleChart(first);
+    buildPieChart(first);
   });
 }
 
